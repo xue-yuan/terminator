@@ -1,0 +1,25 @@
+BASE_URL = "http://lvh.me:8000"
+
+SECRET_KEY = "test"
+
+DATABASE = {
+    "drivername": "postgresql",
+    "database": "terminator",
+    "username": "",
+    "password": "",
+    "host": "127.0.0.1",
+    "port": 5432,
+    "max_overflow": 0,
+    "pool_recycle": 1200,
+    "pool_size": 10,
+    "pool_timeout": 20,
+}
+
+REDIS = {
+    "host": "127.0.0.1",
+    "port": 6379,
+    "password": "",
+}
+
+TOKEN_TTL = 24  # 24 hours
+OLD_TOKEN_TTL = 1  # 1 hour

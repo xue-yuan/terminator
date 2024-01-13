@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "terminator"
+version = "0.1.0"
+description = ""
+authors = ["xue-yuan <denon@xueyuan.dev>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = {extras = ["all"], version = "^0.105.0"}
+sqlalchemy = "^2.0.23"
+passlib = "^1.7.4"
+bcrypt = "^4.1.2"
+psycopg2 = "^2.9.9"
+pyjwt = "^2.8.0"
+redis = "^5.0.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
