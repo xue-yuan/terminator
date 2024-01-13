@@ -11,7 +11,6 @@ from database.models.workout import Workout
 from utils import AuthAPIRouter
 from utils.exceptions import BadRequestException
 
-
 router_with_auth = AuthAPIRouter(
     prefix="/exercise",
     tags=["Exercise"],

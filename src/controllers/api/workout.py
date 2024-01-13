@@ -1,16 +1,15 @@
-from fastapi import Depends, Query
+from fastapi import Depends
 from fastapi.requests import Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 from constants.error import ClientError
-from controllers.models import WorkoutModel, GetWorkoutModel, QueryModel
+from controllers.models import QueryModel, WorkoutModel
 from database import get_tx
 from database.models.exercise import Exercise
 from database.models.workout import Workout
 from utils import AuthAPIRouter
 from utils.exceptions import BadRequestException
-
 
 router_with_auth = AuthAPIRouter(
     prefix="/workout",

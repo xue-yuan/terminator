@@ -2,9 +2,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.security.utils import get_authorization_scheme_param
 from starlette.requests import Request
 
-from utils import token
-from utils.exceptions import UnauthorizedException, ForbiddenException
 from constants.error import ClientError
+from utils import token
+from utils.exceptions import ForbiddenException, UnauthorizedException
 
 
 # To verify whether it is a valid jwt token

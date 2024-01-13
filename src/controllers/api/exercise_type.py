@@ -9,7 +9,6 @@ from database.models.exercise_type import ExerciseType
 from utils import AuthAPIRouter
 from utils.exceptions import BadRequestException
 
-
 router_with_auth = AuthAPIRouter(
     prefix="/exercise/type",
     tags=["Exercise"],

@@ -10,12 +10,11 @@ from constants.error import ClientError
 from constants.example import EMPTY_EXAMPLE_RESPONSES
 from controllers.models import AuthModel, TokenModel
 from database import get_tx
-from database.redis import Redis
 from database.models.user import User
+from database.redis import Redis
 from utils import AuthAPIRouter, token
 from utils.exceptions import BadRequestException
 from utils.responses import EmptyResponse
-
 
 router = APIRouter(tags=["Auth"])
 router_with_auth = AuthAPIRouter(tags=["Auth"])

@@ -1,7 +1,6 @@
 from passlib.hash import bcrypt
-from sqlalchemy import INTEGER, TIMESTAMP, VARCHAR
-from sqlalchemy import Column
-from sqlalchemy.orm import relationship, SessionTransaction
+from sqlalchemy import INTEGER, TIMESTAMP, VARCHAR, Column
+from sqlalchemy.orm import SessionTransaction, relationship
 from sqlalchemy.sql import func
 
 from database.models.base import Base

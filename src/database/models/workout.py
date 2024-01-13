@@ -1,10 +1,9 @@
 from httpx import delete
-from sqlalchemy import INTEGER, TIMESTAMP, VARCHAR
-from sqlalchemy import Column, ForeignKey, delete
-from sqlalchemy.orm import relationship, SessionTransaction
+from sqlalchemy import INTEGER, TIMESTAMP, VARCHAR, Column, ForeignKey, delete
+from sqlalchemy.orm import SessionTransaction, relationship
 from sqlalchemy.sql import func
 
-from controllers.models import OrderEnum, QueryModel
+from controllers.models import QueryModel
 from database import queries
 from database.models.base import Base
 from utils import generate_id

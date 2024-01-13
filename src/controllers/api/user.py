@@ -1,5 +1,4 @@
-from fastapi import APIRouter
-from fastapi import Depends
+from fastapi import APIRouter, Depends
 from fastapi.requests import Request
 from sqlalchemy.orm import sessionmaker
 
@@ -7,7 +6,6 @@ from controllers.models import UserModel
 from database import get_tx
 from database.models.user import User
 from utils import AuthAPIRouter
-
 
 router = APIRouter(
     prefix="/user",

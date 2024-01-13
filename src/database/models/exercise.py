@@ -1,6 +1,5 @@
-from sqlalchemy import INTEGER, VARCHAR
-from sqlalchemy import Column, ForeignKey
-from sqlalchemy.orm import relationship, SessionTransaction
+from sqlalchemy import INTEGER, VARCHAR, Column, ForeignKey
+from sqlalchemy.orm import SessionTransaction, relationship
 
 from database.models.base import Base
 from database.models.set import Set

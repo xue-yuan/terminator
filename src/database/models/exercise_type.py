@@ -1,7 +1,5 @@
-from sqlalchemy import INTEGER, VARCHAR
-from sqlalchemy import Column
-from sqlalchemy import delete
-from sqlalchemy.orm import relationship, SessionTransaction
+from sqlalchemy import INTEGER, VARCHAR, Column, delete
+from sqlalchemy.orm import SessionTransaction, relationship
 
 from database.models.base import Base
 
