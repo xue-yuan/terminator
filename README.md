@@ -1,5 +1,16 @@
 # Terminator
 
+## Prerequsite
+
+1. postgresql >= 14
+
+## Installation
+
+1. `poetry install --no-root`
+2. `cp config.py.example config.py`
+3. fill username and password
+4. uvicorn main:app --reload
+
 ## Structures
 
 1. `src/utils/responses.py` defines custom responses.
