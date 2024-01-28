@@ -1,15 +1,15 @@
 from fastapi import Depends
 from fastapi.requests import Request
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 from constants.error import ClientError
-from controllers.models import WorkoutModel
+from controllers.models import ExerciseModel, WorkoutModel
 from database import get_tx
 from database.models.exercise import Exercise
+from database.models.set import Set
 from database.models.workout import Workout
 from utils import AuthAPIRouter
-from utils.exceptions import BadRequestException
+from utils.exceptions import ForbiddenException
 
 router_with_auth = AuthAPIRouter(
     prefix="/exercise",
@@ -18,35 +18,81 @@ router_with_auth = AuthAPIRouter(
 
 
 @router_with_auth.post("", response_model=WorkoutModel)
-def create_exercise(request: Request, body: WorkoutModel, tx: sessionmaker = Depends(get_tx)):
-    try:
-        with tx.begin() as session:
-            workout = Workout.create(
-                session, request.state.user_id, body.datetime
+def create_exercise(request: Request, workout_id: str, body: ExerciseModel, tx: sessionmaker = Depends(get_tx)):
+    with tx.begin() as session:
+        if not Workout.is_valid_user(
+            s=session,
+            user_id=request.state.user_id,
+            workout_id=workout_id,
+        ):
+            raise ForbiddenException(
+                error_code=ClientError.INVALID_USER_OPERATION,
             )
 
-            session.flush()  # sync the object to database
-            Exercise.bulk_create(session, body.exercises, workout)
-    except IntegrityError as e:
-        print(e)
-        raise BadRequestException(
-            error_code=ClientError.DATABASE_INTEGRITY_ERROR,
+        exercise = Exercise.create(
+            s=session,
+            workout_id=workout_id,
+            exercise_type=body.exercise_type,
         )
 
-    return body
+        session.flush()
+        Set.bulk_create(
+            s=session,
+            sets=body.sets,
+            exercise=exercise
+        )
+
+    return Workout.get_by_workout_id(workout_id)
 
 
-@router_with_auth.delete("")
-def delete_workout(request: Request, workout_id: str, tx: sessionmaker = Depends(get_tx)):
-    try:
-        with tx.begin() as session:
-            user_id = request.state.user_id
-            Workout.delete_by_workout_id(
-                session, user_id, workout_id
+@router_with_auth.put("", response_model=WorkoutModel)
+def update_exercise(request: Request, workout_id: str, exercise_id: str, body: ExerciseModel, tx: sessionmaker = Depends(get_tx)):
+    with tx.begin() as session:
+        if not Workout.is_valid_user(
+            s=session,
+            user_id=request.state.user_id,
+            workout_id=workout_id,
+        ):
+            raise ForbiddenException(
+                error_code=ClientError.INVALID_USER_OPERATION,
             )
-            return Workout.get_all(session, user_id)
-    except IntegrityError as e:
-        print(e)
-        raise BadRequestException(
-            error_code=ClientError.DATABASE_INTEGRITY_ERROR,
+
+        exercise = Exercise.update(
+            s=session,
+            exercise_id=exercise_id,
+            exercise_type_id=body.exercise_type_id,
+
         )
+
+        session.flush()
+        Set.delete_by_exercise_id(
+            s=session,
+            exercise_id=exercise_id
+        )
+        Set.bulk_create(
+            s=session,
+            sets=body.sets,
+            exercise=exercise,
+        )
+
+    return Workout.get_by_workout_id(workout_id)
+
+
+@router_with_auth.delete("", response_model=WorkoutModel)
+def delete_exercise(request: Request, workout_id: str, exercise_id: str, tx: sessionmaker = Depends(get_tx)):
+    with tx.begin() as session:
+        if not Workout.is_valid_user(
+            s=session,
+            user_id=request.state.user_id,
+            workout_id=workout_id,
+        ):
+            raise ForbiddenException(
+                error_code=ClientError.INVALID_USER_OPERATION,
+            )
+
+        Exercise.delete_by_exercise_id(
+            s=session,
+            exercise_id=exercise_id,
+        )
+
+    return Workout.get_by_workout_id(workout_id)

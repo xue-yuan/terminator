@@ -39,7 +39,7 @@ def get_all_workouts(order):
             FROM workouts w
             LEFT JOIN exercises e ON w.workout_id = e.workout_id
             WHERE w.user_id = :user_id
-            AND w.datetime BETWEEN :start_date AND :end_date
+            AND w.datetime BETWEEN :from_date AND :to_date
             GROUP BY w.workout_id, w.datetime
             ORDER BY w.datetime {order}
             LIMIT :limit OFFSET :offset
@@ -48,7 +48,7 @@ def get_all_workouts(order):
             SELECT COUNT(DISTINCT workout_id) AS total
             FROM workouts AS w
             WHERE user_id = :user_id
-            AND w.datetime BETWEEN :start_date AND :end_date
+            AND w.datetime BETWEEN :from_date AND :to_date
         )
         SELECT
             json_build_object(

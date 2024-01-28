@@ -1,9 +1,8 @@
-from sqlalchemy import INTEGER, VARCHAR, Column, ForeignKey
+from sqlalchemy import INTEGER, VARCHAR, Column, ForeignKey, delete
 from sqlalchemy.orm import SessionTransaction, relationship
 
 from database.models.base import Base
 from database.models.set import Set
-from database.models.workout import Workout
 from utils import generate_id
 
 
@@ -41,7 +40,7 @@ class Exercise(Base):
         return exercise
 
     @classmethod
-    def bulk_create(cls, s: SessionTransaction, _exercises, workout: Workout):
+    def bulk_create(cls, s: SessionTransaction, _exercises, workout):
         exercises = []
         sets = []
 
@@ -65,3 +64,21 @@ class Exercise(Base):
         s.bulk_save_objects(sets)
 
         return exercises
+
+    @classmethod
+    def update(cls, s: SessionTransaction, exercise_id: str, exercise_type_id: str):
+        return s.query(cls).filter_by(exercise_id=exercise_id).update({
+            "exercise_type_id": exercise_type_id,
+        })
+
+    @classmethod
+    def delete_by_exercise_id(cls, s: SessionTransaction, exercise_id: str):
+        s.execute(delete(cls).where(
+            (cls.exercise_id == exercise_id)
+        ))
+
+    @classmethod
+    def delete_by_workout_id(cls, s: SessionTransaction, workout_id: str):
+        s.execute(delete(cls).where(
+            (cls.workout_id == workout_id)
+        ))

@@ -19,19 +19,9 @@ class ExerciseType(Base):
     @classmethod
     def get_all(cls, s: SessionTransaction):
         return [{
-            "id": e.id,
+            "exercise_type_id": e.id,
             "exercise_name": e.exercise_name,
         } for e in s.query(cls).order_by(cls.exercise_name.asc()).all()]
-
-    @classmethod
-    def delete_by_id(cls, s: SessionTransaction, id: int):
-        s.execute(delete(cls).where((cls.id == id)))
-
-    @classmethod
-    def update(cls, s: SessionTransaction, id: int, exercise_name: str):
-        return s.query(cls).filter_by(id=id).update({
-            "exercise_name": exercise_name,
-        })
 
     @classmethod
     def create(cls, s: SessionTransaction, exercise_name: str):
@@ -41,3 +31,13 @@ class ExerciseType(Base):
 
         s.add(exercise)
         return exercise
+
+    @classmethod
+    def update(cls, s: SessionTransaction, id: int, exercise_name: str):
+        return s.query(cls).filter_by(id=id).update({
+            "exercise_name": exercise_name,
+        })
+
+    @classmethod
+    def delete_by_id(cls, s: SessionTransaction, id: int):
+        s.execute(delete(cls).where((cls.id == id)))

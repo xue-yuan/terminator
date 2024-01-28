@@ -3,7 +3,7 @@ from sqlalchemy import INTEGER, TIMESTAMP, VARCHAR, Column, ForeignKey, delete
 from sqlalchemy.orm import SessionTransaction, relationship
 from sqlalchemy.sql import func
 
-from controllers.models import QueryModel
+from controllers.models import DateModel, QueryModel
 from database import queries
 from database.models.base import Base
 from utils import generate_id
@@ -24,23 +24,30 @@ class Workout(Base):
     exercises = relationship("Exercise", back_populates="workout")
 
     @classmethod
-    def get_all(cls, s: SessionTransaction, user_id: str, query: QueryModel):
+    def get_by_workout_id(cls, s: SessionTransaction, workout_id: str):
+        return s.query(cls).where(cls.workout_id == workout_id).one_or_none()
+
+    @classmethod
+    def get_by_auth_workout_id(cls, s: SessionTransaction, user_id: str, workout_id: str):
+        return s.query(cls).where(
+            (cls.user_id == user_id) &
+            (cls.workout_id == workout_id)
+        ).one_or_none()
+
+    @classmethod
+    def get_all(cls, s: SessionTransaction, user_id: str, query: QueryModel, date: DateModel):
         result = [r for r in s.execute(
             queries.get_all_workouts(query.order.value),
             {
                 "user_id": user_id,
-                "start_date": "2020-01-01",
-                "end_date": "2025-01-01",
+                "start_date": date.from_date,
+                "end_date": date.to_date,
                 "limit": query.limit,
                 "offset": query.offset,
             }
         )]
 
         return result[0][0]
-
-    @classmethod
-    def get_by_workout_id(cls, s: SessionTransaction, workout_id: str):
-        return s.query(cls).where(cls.workout_id == workout_id).one_or_none()
 
     @classmethod
     def create(cls, s: SessionTransaction, user_id: str, datetime: str):
@@ -54,8 +61,30 @@ class Workout(Base):
         return workout
 
     @classmethod
-    def delete_by_workout_id(cls, s: SessionTransaction, user_id: str, workout_id: str):
+    def update_by_auth_workout_id(cls, s: SessionTransaction, user_id: str, workout_id: str, datetime):
+        return s.query(cls).filter(
+            (cls.user_id == user_id) &
+            (cls.workout_id == workout_id)
+        ).update({
+            "datetime": datetime,
+        })
+
+    @classmethod
+    def delete_by_workout_id(cls, s: SessionTransaction, workout_id: str):
+        s.execute(delete(cls).where(
+            (cls.workout_id == workout_id)
+        ))
+
+    @classmethod
+    def delete_by_auth_workout_id(cls, s: SessionTransaction, user_id: str, workout_id: str):
         s.execute(delete(cls).where(
             (cls.user_id == user_id) &
             (cls.workout_id == workout_id)
         ))
+
+    @classmethod
+    def is_valid_user(cls, s: SessionTransaction, user_id: str, workout_id: str) -> bool:
+        return bool(s.query(cls).where(
+            (cls.user_id == user_id) &
+            (cls.workout_id == workout_id)
+        ).one_or_none())

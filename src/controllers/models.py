@@ -43,14 +43,19 @@ class QueryModel(BaseModel):
     order: OrderEnum = OrderEnum.desc
 
 
+class DateModel(BaseModel):
+    from_date: str = "2020-01-01"
+    to_date: str = "2025-01-01"
+
+
 class UserModel(BaseModel):
     user_id: str = "user-0b4d2552bff241cd8edff0dac909f92b"
     username: str = "username"
 
 
 class ExerciseTypeModel(BaseModel):
-    id: int = 1
-    exercise_name: str = "test"
+    exercise_type_id: int = 1
+    exercise_name: str = "example activity name"
 
 
 class UpsertExerciseTypeModel(BaseModel):

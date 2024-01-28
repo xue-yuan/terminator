@@ -52,10 +52,6 @@ def register(body: AuthModel, tx: sessionmaker = Depends(get_tx)):
                 error_code=ClientError.DUPLICATE_USERNAME,
             )
 
-        raise BadRequestException(
-            error_code=ClientError.DATABASE_INTEGRITY_ERROR,
-        )
-
     return TokenModel(
         token=token.generate(user_id=user.user_id)
     )

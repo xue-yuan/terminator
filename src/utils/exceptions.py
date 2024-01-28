@@ -1,13 +1,12 @@
 from fastapi.exceptions import HTTPException
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 from starlette.status import (
-    HTTP_400_BAD_REQUEST,
-    HTTP_401_UNAUTHORIZED,
-    HTTP_403_FORBIDDEN,
-    HTTP_500_INTERNAL_SERVER_ERROR,
+    HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED,
+    HTTP_403_FORBIDDEN, HTTP_500_INTERNAL_SERVER_ERROR
 )
 
-from constants.error import ServerError
+from constants.error import ClientError, ServerError
 
 
 class CustomException(HTTPException):
@@ -66,4 +65,11 @@ async def http_exception_handler(request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
         content={"error_code": ServerError.UNDOCUMENTED_EXCEPTION},
+    )
+
+
+async def integrity_exception_handler(request, exc: IntegrityError):
+    return JSONResponse(
+        status_code=500,
+        content={"error_code": ClientError.DATABASE_INTEGRITY_ERROR},
     )

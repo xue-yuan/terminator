@@ -12,3 +12,4 @@ class ClientError(IntEnum):
     DUPLICATE_USERNAME = auto()
     DATABASE_INTEGRITY_ERROR = auto()
     INCORRECT_USERNAME_OR_PASSWORD = auto()
+    INVALID_USER_OPERATION = auto()
