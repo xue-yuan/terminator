@@ -4,9 +4,11 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.security import InvalidToken, decode_token
 from app.db.session import get_db
 from app.models.user import User
+from app.services.access import AccessService
 from app.services.auth import AuthService
 from app.services.backup import BackupService
 from app.services.body_weight import BodyWeightService
@@ -48,6 +50,15 @@ async def get_current_user(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
+async def get_admin(user: CurrentUser) -> User:
+    if not settings.is_admin(user.email):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins only")
+    return user
+
+
+AdminUser = Annotated[User, Depends(get_admin)]
+
+
 def _auth_service(db: DB) -> AuthService:
     return AuthService(db)
 
@@ -72,6 +83,10 @@ def _body_weight_service(db: DB) -> BodyWeightService:
     return BodyWeightService(db)
 
 
+def _access_service(db: DB) -> AccessService:
+    return AccessService(db)
+
+
 def _backup_service(db: DB) -> BackupService:
     return BackupService(db)
 
@@ -87,4 +102,5 @@ PlanSvc = Annotated[PlanService, Depends(_plan_service)]
 SummarySvc = Annotated[SummaryService, Depends(_summary_service)]
 BodyWeightSvc = Annotated[BodyWeightService, Depends(_body_weight_service)]
 BackupSvc = Annotated[BackupService, Depends(_backup_service)]
+AccessSvc = Annotated[AccessService, Depends(_access_service)]
 SpotifySvc = Annotated[SpotifyService, Depends(_spotify_service)]

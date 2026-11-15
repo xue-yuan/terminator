@@ -8,9 +8,13 @@ from app.core.config import settings
 from app.models.user import User
 from app.schemas.token import AuthConfig, GoogleLoginRequest, RefreshRequest, Token
 from app.schemas.user import Summary, UserOut
-from app.services.auth import GoogleAuthError, GoogleUnavailable
+from app.services.access import AccessService
+from app.services.auth import DEV_USER_EMAIL, GoogleAuthError, GoogleUnavailable
 
 router = APIRouter()
+
+
+NOT_ALLOWED = HTTPException(status_code=403, detail="This account isn't allowed to use this app")
 
 
 def _issue_tokens(user: User) -> Token:
@@ -43,6 +47,8 @@ async def login_google(payload: GoogleLoginRequest, auth: AuthSvc) -> Token:
         raise HTTPException(
             status_code=503, detail="Couldn't reach Google to check the sign-in. Try again."
         ) from None
+    if not await AccessService(auth.db).allowed(google_data["email"]):
+        raise NOT_ALLOWED  # before creating an account for it
     user = await auth.get_or_create_google_user(google_data)
     if not user.is_active:
         raise unauthorized("User is inactive")
@@ -54,6 +60,8 @@ async def login_dev(auth: AuthSvc) -> Token:
     """Local development only: sign in as the dev user without credentials."""
     if not settings.dev_login_enabled:
         raise HTTPException(status_code=404, detail="Not found")
+    if not await AccessService(auth.db).allowed(DEV_USER_EMAIL):
+        raise NOT_ALLOWED
     return _issue_tokens(await auth.get_or_create_dev_user())
 
 
@@ -71,8 +79,8 @@ async def refresh(payload: RefreshRequest, auth: AuthSvc) -> Token:
 
 
 @router.get("/users/me", response_model=UserOut)
-async def read_me(user: CurrentUser) -> User:
-    return user
+async def read_me(user: CurrentUser) -> UserOut:
+    return UserOut.model_validate(user).model_copy(update={"is_admin": settings.is_admin(user.email)})
 
 
 @router.get("/users/me/summary", response_model=Summary)

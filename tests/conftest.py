@@ -14,6 +14,7 @@ os.environ["DEV_LOGIN_ENABLED"] = "true"
 os.environ["GOOGLE_CLIENT_ID"] = "test-client.apps.googleusercontent.com"
 os.environ["SECRET_KEY"] = "test-secret-key-that-is-at-least-32-bytes-long"
 os.environ["SPOTIFY_CLIENT_ID"] = ""
+os.environ["ADMIN_EMAILS"] = ""
 
 import asyncpg  # noqa: E402
 import pytest  # noqa: E402

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.user import User
+from app.services.access import AccessService
 
 GOOGLE_TOKEN_INFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 GOOGLE_ISSUERS = {"accounts.google.com", "https://accounts.google.com"}
@@ -70,5 +71,9 @@ class AuthService:
         return user
 
     async def get_active_user(self, user_id: int) -> User | None:
+        """The user, unless deactivated or no longer allowed (app/services/access.py).
+        Every authenticated request and token refresh goes through here."""
         user = await self.db.get(User, user_id)
-        return user if user and user.is_active else None
+        if user and user.is_active and await AccessService(self.db).allowed(user.email):
+            return user
+        return None

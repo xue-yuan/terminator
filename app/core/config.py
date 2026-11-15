@@ -37,6 +37,9 @@ class Settings(BaseSettings):
 
     # Google Sign-In is enabled only when this looks like a real OAuth client id.
     GOOGLE_CLIENT_ID: str = ""
+    # Admins (comma-separated emails): always allowed, and they choose who else may
+    # use the app (in the app, stored in the database). Empty: anyone who can sign in.
+    ADMIN_EMAILS: str = ""
 
     # Spotify playback controls while logging (a Spotify app's client id; the
     # browser signs in with PKCE, so no secret). Empty: the feature is hidden.
@@ -87,6 +90,17 @@ class Settings(BaseSettings):
         if self.DEV_LOGIN_ENABLED is None:
             return self.ENVIRONMENT == "local"
         return self.DEV_LOGIN_ENABLED
+
+    @property
+    def admin_emails(self) -> frozenset[str]:
+        return frozenset(e.strip().lower() for e in self.ADMIN_EMAILS.split(",") if e.strip())
+
+    @property
+    def access_restricted(self) -> bool:
+        return bool(self.admin_emails)
+
+    def is_admin(self, email: str) -> bool:
+        return email.strip().lower() in self.admin_emails
 
     @property
     def google_login_enabled(self) -> bool:

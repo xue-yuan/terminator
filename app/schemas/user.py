@@ -9,6 +9,7 @@ class UserOut(BaseModel):
     id: int
     email: str
     full_name: str | None
+    is_admin: bool = False  # in ADMIN_EMAILS: may manage who uses the app
 
 
 class Summary(BaseModel):
