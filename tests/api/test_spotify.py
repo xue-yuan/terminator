@@ -54,7 +54,7 @@ async def test_sign_in_then_tokens(client, user, spotify):
     assert "user-modify-playback-state" in query["scope"]
 
     r = await client.get("/api/v1/spotify/callback", params={"state": query["state"], "code": "the-code"})
-    assert r.status_code == 200 and "Spotify connected" in r.text
+    assert (r.status_code, r.headers["location"]) == (303, "/spotify/done?connected=1")  # back into the app
     exchange = spotify["calls"][0]
     assert exchange["grant_type"] == "authorization_code" and exchange["code"] == "the-code"
     assert _challenge(exchange["code_verifier"]) == query["code_challenge"]  # PKCE pair matches
@@ -67,7 +67,7 @@ async def test_sign_in_then_tokens(client, user, spotify):
 
     # the same state can't be used twice
     r = await client.get("/api/v1/spotify/callback", params={"state": query["state"], "code": "again"})
-    assert r.status_code == 400
+    assert r.headers["location"] == "/spotify/done?error=expired"
 
 
 async def test_expired_tokens_are_refreshed_and_a_dead_refresh_token_disconnects(client, user, spotify):
@@ -92,11 +92,22 @@ async def test_expired_tokens_are_refreshed_and_a_dead_refresh_token_disconnects
     assert r.json()["connected"] is False
 
 
+async def test_failed_token_exchange_says_so(client, user, spotify, monkeypatch):
+    query = await connect(client, user)
+
+    async def refuse(self, data):
+        raise SpotifyError("Spotify refused (400)")
+
+    monkeypatch.setattr(SpotifyService, "_token_request", refuse)
+    r = await client.get("/api/v1/spotify/callback", params={"state": query["state"], "code": "c"})
+    assert r.headers["location"] == "/spotify/done?error=failed"
+
+
 async def test_callback_errors_and_disconnect(client, user, spotify):
     r = await client.get("/api/v1/spotify/callback", params={"error": "access_denied"})
-    assert r.status_code == 400
+    assert r.headers["location"] == "/spotify/done?error=denied"
     r = await client.get("/api/v1/spotify/callback", params={"state": "made-up", "code": "c"})
-    assert r.status_code == 400 and "expired" in r.text
+    assert r.headers["location"] == "/spotify/done?error=expired"
 
     query = await connect(client, user)
     await client.get("/api/v1/spotify/callback", params={"state": query["state"], "code": "c"})

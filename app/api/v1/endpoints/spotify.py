@@ -1,12 +1,12 @@
-from html import escape
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, HTTPException, Query, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import RedirectResponse
 
 from app.api.deps import CurrentUser, SpotifySvc
 from app.core.config import settings
 from app.schemas.spotify import SpotifyAuthorizeUrl, SpotifyConnect, SpotifyStatus, SpotifyToken
-from app.services.spotify import NotConnected, SpotifyError
+from app.services.spotify import NotConnected, SpotifyError, SpotifyExpired
 
 router = APIRouter()
 
@@ -31,16 +31,9 @@ async def spotify_connect(data: SpotifyConnect, user: CurrentUser, service: Spot
     return SpotifyAuthorizeUrl(url=await service.start(user.id, data.origin))
 
 
-def _page(title: str, body: str, ok: bool) -> HTMLResponse:
-    color = "#1d8a4c" if ok else "#cc2b1d"
-    return HTMLResponse(
-        f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>{escape(title)}</title>
-<style>body{{font:18px/1.5 system-ui,sans-serif;background:#f2f0ea;color:#141414;margin:0;padding:48px 24px}}
-h1{{font-size:28px;margin:0 0 8px;border-left:6px solid {color};padding-left:12px}}a{{color:#141414}}</style>
-</head><body><h1>{escape(title)}</h1><p>{escape(body)}</p><p><a href="/">Open Terminator</a></p></body></html>""",
-        status_code=200 if ok else 400,
-    )
+# Back into the app, which shows the result in its own design. Relative, so the
+# browser resolves it against the address the app is open at.
+DONE = "/spotify/done"
 
 
 @router.get("/callback", include_in_schema=False)
@@ -49,15 +42,17 @@ async def spotify_callback(
     state: str = Query(""),
     code: str = Query(""),
     error: str = Query(""),
-) -> HTMLResponse:
+) -> RedirectResponse:
     """Where Spotify sends the browser back after signing in."""
     if error or not code:
-        return _page("Spotify not connected", "Spotify didn't allow access. Try again from the app.", ok=False)
+        return RedirectResponse(f"{DONE}?{urlencode({'error': 'denied'})}", status_code=303)
     try:
         await service.finish(state, code)
-    except SpotifyError as exc:
-        return _page("Spotify not connected", str(exc), ok=False)
-    return _page("Spotify connected", "Go back to Terminator: the music controls are ready.", ok=True)
+    except SpotifyExpired:
+        return RedirectResponse(f"{DONE}?{urlencode({'error': 'expired'})}", status_code=303)
+    except SpotifyError:
+        return RedirectResponse(f"{DONE}?{urlencode({'error': 'failed'})}", status_code=303)
+    return RedirectResponse(f"{DONE}?connected=1", status_code=303)
 
 
 @router.post("/token", response_model=SpotifyToken)

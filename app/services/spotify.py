@@ -26,6 +26,10 @@ class SpotifyError(Exception):
     """Spotify refused or couldn't be reached."""
 
 
+class SpotifyExpired(SpotifyError):
+    """The sign-in took too long or was already used: start again."""
+
+
 class NotConnected(Exception):
     pass
 
@@ -93,7 +97,7 @@ class SpotifyService:
             await self.db.execute(select(SpotifyLink).where(SpotifyLink.pending_state == state))
         ).scalar_one_or_none()
         if link is None or link.pending_at is None or datetime.now(UTC) - link.pending_at > PENDING_FOR:
-            raise SpotifyError("This sign-in expired. Start again from the app.")
+            raise SpotifyExpired("This sign-in expired. Start again from the app.")
         tokens = await self._token_request(
             {
                 "grant_type": "authorization_code",
