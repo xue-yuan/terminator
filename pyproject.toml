@@ -1,0 +1,31 @@
+[project]
+name = "terminator"
+version = "0.2.0"
+description = "Workout tracker: FastAPI backend + SolidJS PWA"
+authors = [
+    {name = "xue-yuan",email = "denon@xueyuan.dev"}
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "alembic>=1.14",
+    "asyncpg>=0.30",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "pyjwt>=2.9",
+    "httpx>=0.27",
+    "email-validator>=2.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "anyio>=4.6",
+]
+
+[tool.uv]
+package = false
+# Only use uv-managed interpreters, never Homebrew/system Python.
+python-preference = "only-managed"
