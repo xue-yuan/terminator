@@ -29,3 +29,7 @@ dev = [
 package = false
 # Only use uv-managed interpreters, never Homebrew/system Python.
 python-preference = "only-managed"
+
+[tool.vercel]
+# Vercel's FastAPI support serves this app for every path (no rewrites needed).
+entrypoint = "app.main:app"
