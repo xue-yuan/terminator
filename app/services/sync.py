@@ -19,6 +19,7 @@ from app.models.plan import Plan, PlanDay, PlanExercise
 from app.models.spotify import SpotifyLink
 from app.models.user import User
 from app.models.workout import Workout
+from app.services.catalog import CatalogService
 
 
 def _digest(*parts: object) -> str:
@@ -66,6 +67,7 @@ class SyncService:
         exercises = await self._count_and_latest(Exercise, user.id)
         body_weights = await self._count_and_latest(BodyWeight, user.id)
         plans = await self._plans(user.id)
+        catalog = await CatalogService(self.db).fingerprint()
         spotify = (
             await self.db.execute(select(SpotifyLink.updated_at).where(SpotifyLink.user_id == user.id))
         ).scalar_one_or_none()
@@ -75,6 +77,8 @@ class SyncService:
             "exercises": _digest(exercises, workouts),
             "plans": _digest(plans, exercises),
             "body_weights": _digest(body_weights),
+            # The exercise library is shared: the same for everyone.
+            "catalog": _digest(catalog),
             "summary": _digest(workouts, plans, user.active_plan_id),
             "spotify": _digest(bool(settings.SPOTIFY_CLIENT_ID), spotify),
             "user": _digest(user.email, user.full_name, user.active_plan_id, settings.is_admin(user.email)),

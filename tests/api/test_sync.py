@@ -26,7 +26,7 @@ def changed(before: dict, after: dict) -> set[str]:
 
 async def test_fingerprints_move_only_with_their_data(client, user, make_user):
     s0 = await _state(client, user)
-    assert set(s0) == {"workouts", "exercises", "plans", "body_weights", "summary", "spotify", "user"}
+    assert set(s0) == {"workouts", "exercises", "plans", "body_weights", "catalog", "summary", "spotify", "user"}
     assert s0 == await _state(client, user)  # stable while nothing changes
 
     # A workout (which creates its exercise) moves what shows workouts or their stats.

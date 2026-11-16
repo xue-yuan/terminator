@@ -12,6 +12,7 @@ from app.services.access import AccessService
 from app.services.auth import AuthService
 from app.services.backup import BackupService
 from app.services.body_weight import BodyWeightService
+from app.services.catalog import CatalogService
 from app.services.exercise import ExerciseService
 from app.services.plan import PlanService
 from app.services.spotify import SpotifyService
@@ -83,6 +84,10 @@ def _body_weight_service(db: DB) -> BodyWeightService:
     return BodyWeightService(db)
 
 
+def _catalog_service(db: DB) -> CatalogService:
+    return CatalogService(db)
+
+
 def _access_service(db: DB) -> AccessService:
     return AccessService(db)
 
@@ -103,4 +108,5 @@ SummarySvc = Annotated[SummaryService, Depends(_summary_service)]
 BodyWeightSvc = Annotated[BodyWeightService, Depends(_body_weight_service)]
 BackupSvc = Annotated[BackupService, Depends(_backup_service)]
 AccessSvc = Annotated[AccessService, Depends(_access_service)]
+CatalogSvc = Annotated[CatalogService, Depends(_catalog_service)]
 SpotifySvc = Annotated[SpotifyService, Depends(_spotify_service)]
