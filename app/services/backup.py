@@ -136,6 +136,9 @@ class BackupService:
             plans_created += 1
 
         weights = await self._import_body_weights(user_id, data.body_weights)
+        # The steps above commit only when they have something to import: a
+        # backup of exercises alone must not be left in a flushed transaction.
+        await self.db.commit()
         return ImportResult(
             exercises_created=created_exercises,
             workouts_created=created,

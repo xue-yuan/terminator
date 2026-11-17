@@ -125,4 +125,6 @@ def test_the_migrated_catalog_is_valid():
     for name, zh, aka, muscle in migration.SEED:
         entry = CatalogIn(name=name, zh=zh, aka=aka, muscle_group=muscle)
         assert (entry.name, entry.zh, entry.aka) == (name, zh, aka), name  # stored as written
-        assert zh and muscle in get_args(MuscleGroup), name
+        # "arms" was split into biceps and triceps later (e1f3b5c7a9d2, tested in test_muscle_groups.py).
+        assert entry.muscle_group in (("biceps", "triceps") if muscle == "arms" else (muscle,)), name
+        assert zh and entry.muscle_group in get_args(MuscleGroup), name

@@ -2,12 +2,36 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 from app.schemas.common import Name, OptionalText, WeightUnit
 from app.schemas.workout import SetOut
 
-MuscleGroup = Literal["chest", "back", "legs", "shoulders", "arms", "core", "other"]
+MuscleGroup = Literal["chest", "back", "legs", "shoulders", "biceps", "triceps", "core", "other"]
+
+# "arms" was one group until biceps and triceps were split (migration
+# e1f3b5c7a9d2, which files existing rows the same way). Older app versions and
+# backups still send it: the exercise's name says which one it is.
+_TRICEPS = ("tricep", "pushdown", "push-down", "skull", "extension", "kickback", "close-grip", "dip", "三頭", "下壓", "伸展", "窄握", "撐體")
+_BICEPS = ("curl", "bicep", "彎舉", "二頭")
+
+
+def arms_group(*names: str | None) -> str:
+    """Biceps or triceps for an exercise once filed under "arms" (other if neither fits)."""
+    text = " ".join(n for n in names if n).lower()
+    if any(word in text for word in _TRICEPS):
+        return "triceps"
+    if any(word in text for word in _BICEPS):
+        return "biceps"
+    return "other"
+
+
+def file_legacy_arms(value: object, info: ValidationInfo) -> object:
+    """A field validator (mode="before") for muscle_group: "arms" becomes biceps or triceps."""
+    if value != "arms":
+        return value
+    return arms_group(info.data.get("name"), info.data.get("zh"), info.data.get("aka"))
+
 Reps = Annotated[int, Field(ge=1, le=100)] | None
 
 
@@ -21,6 +45,8 @@ class ExerciseIn(BaseModel):
     rep_max: Reps = None
     increment: Annotated[float, Field(gt=0, le=50)] | None = None
     rest_seconds: Annotated[int, Field(ge=0, le=1800)] | None = None
+
+    _arms = field_validator("muscle_group", mode="before")(file_legacy_arms)
 
     @model_validator(mode="after")
     def _reps_range(self) -> "ExerciseIn":
@@ -48,6 +74,8 @@ class ExerciseOut(BaseModel):
     notes: str | None
     rep_min: int | None
     rep_max: int | None
+
+    _arms = field_validator("muscle_group", mode="before")(file_legacy_arms)
     increment: float | None
     rest_seconds: int | None
     updated_at: datetime

@@ -1,9 +1,9 @@
 from typing import Annotated
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, StringConstraints
+from pydantic import BaseModel, BeforeValidator, ConfigDict, StringConstraints, field_validator
 
 from app.schemas.common import Name
-from app.schemas.exercise import MuscleGroup
+from app.schemas.exercise import MuscleGroup, file_legacy_arms
 
 
 def _blank_to_none(value: object) -> object:
@@ -28,6 +28,8 @@ class CatalogIn(BaseModel):
     aka: _optional(300) = None
     muscle_group: MuscleGroup
 
+    _arms = field_validator("muscle_group", mode="before")(file_legacy_arms)
+
 
 class CatalogOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -37,3 +39,5 @@ class CatalogOut(BaseModel):
     zh: str | None
     aka: str | None
     muscle_group: MuscleGroup
+
+    _arms = field_validator("muscle_group", mode="before")(file_legacy_arms)
