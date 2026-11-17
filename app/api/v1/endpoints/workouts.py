@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from app.api.deps import CurrentUser, WorkoutSvc
 from app.models.workout import Workout
-from app.schemas.workout import WorkoutCreate, WorkoutIn, WorkoutOut
+from app.schemas.workout import WorkoutActivity, WorkoutCreate, WorkoutIn, WorkoutOut
 from app.services.errors import Invalid, NotFound
 
 router = APIRouter()
@@ -21,6 +21,14 @@ async def list_workouts(
 ):
     """Most recent first."""
     return await service.list_for_user(user.id, skip=skip, limit=limit)
+
+
+# Declared before /workouts/{workout_id}, which would otherwise take "activity" for an id.
+@router.get("/workouts/activity", response_model=list[WorkoutActivity])
+async def workout_activity(user: CurrentUser, service: WorkoutSvc) -> list[WorkoutActivity]:
+    """All of your workouts in brief (date, name, length, working sets), most recent
+    first. Small enough for the app to cache whole for its training calendar."""
+    return await service.activity(user.id)
 
 
 @router.post("/workouts/", response_model=WorkoutOut, status_code=status.HTTP_201_CREATED)

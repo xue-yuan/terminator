@@ -74,3 +74,13 @@ class WorkoutOut(BaseModel):
     items: list[WorkoutItemOut]
     created_at: datetime
     updated_at: datetime
+
+
+class WorkoutActivity(BaseModel):
+    """A workout reduced to what a calendar needs: small enough to cache all of them."""
+
+    id: UUID
+    performed_at: datetime
+    name: str | None
+    duration_seconds: int | None
+    sets: int  # working sets (warm-ups don't count)

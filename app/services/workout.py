@@ -1,14 +1,14 @@
 from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.exercise import Exercise
 from app.models.workout import Workout, WorkoutItem, WorkoutSet, utcnow
-from app.schemas.workout import WorkoutIn
+from app.schemas.workout import WorkoutActivity, WorkoutIn
 from app.services.errors import Invalid, NotFound
 from app.services.exercise import ExerciseService
 from app.services.plan import PlanService
@@ -50,6 +50,22 @@ class WorkoutService:
         workouts = (await self.db.execute(stmt)).scalars().all()
         await mark_prs(self.db, user_id, workouts)
         return workouts
+
+    async def activity(self, user_id: int) -> list[WorkoutActivity]:
+        """Every workout's date, name, length and working-set count, most recent first."""
+        working_sets = func.count(WorkoutSet.id).filter(WorkoutSet.kind == "working")
+        stmt = (
+            select(Workout.uuid, Workout.performed_at, Workout.name, Workout.duration_seconds, working_sets)
+            .outerjoin(WorkoutItem, WorkoutItem.workout_id == Workout.id)
+            .outerjoin(WorkoutSet, WorkoutSet.item_id == WorkoutItem.id)
+            .where(Workout.user_id == user_id)
+            .group_by(Workout.id)
+            .order_by(Workout.performed_at.desc(), Workout.id.desc())
+        )
+        return [
+            WorkoutActivity(id=id_, performed_at=at, name=name, duration_seconds=duration, sets=sets)
+            for id_, at, name, duration, sets in (await self.db.execute(stmt)).all()
+        ]
 
     async def _find(self, workout_uuid: UUID) -> Workout | None:
         stmt = (

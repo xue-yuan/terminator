@@ -75,6 +75,8 @@ class SyncService:
             # Workouts show exercise names; exercises carry stats and records from workouts.
             "workouts": _digest(workouts, exercises),
             "exercises": _digest(exercises, workouts),
+            # Dates and set counts of all workouts (the training calendar).
+            "activity": _digest(workouts),
             "plans": _digest(plans, exercises),
             "body_weights": _digest(body_weights),
             # The exercise library is shared: the same for everyone.

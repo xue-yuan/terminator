@@ -26,19 +26,29 @@ def changed(before: dict, after: dict) -> set[str]:
 
 async def test_fingerprints_move_only_with_their_data(client, user, make_user):
     s0 = await _state(client, user)
-    assert set(s0) == {"workouts", "exercises", "plans", "body_weights", "catalog", "summary", "spotify", "user"}
+    assert set(s0) == {
+        "workouts",
+        "exercises",
+        "activity",
+        "plans",
+        "body_weights",
+        "catalog",
+        "summary",
+        "spotify",
+        "user",
+    }
     assert s0 == await _state(client, user)  # stable while nothing changes
 
     # A workout (which creates its exercise) moves what shows workouts or their stats.
     wid = uuid.uuid4()
     assert (await client.put(f"/api/v1/workouts/{wid}", json=workout(), headers=user["headers"])).status_code == 201
     s1 = await _state(client, user)
-    assert changed(s0, s1) == {"workouts", "exercises", "plans", "summary"}
+    assert changed(s0, s1) == {"workouts", "exercises", "activity", "plans", "summary"}
 
     # Editing it again moves them again (same row count, later update).
     await client.put(f"/api/v1/workouts/{wid}", json=workout(notes="felt heavy"), headers=user["headers"])
     s2 = await _state(client, user)
-    assert {"workouts", "summary"} <= changed(s1, s2)
+    assert {"workouts", "activity", "summary"} <= changed(s1, s2)
 
     # A weigh-in only moves body weights.
     entry = {"measured_at": "2026-11-10T07:00:00Z", "weight": 80, "unit": "kg"}
@@ -66,7 +76,7 @@ async def test_fingerprints_move_only_with_their_data(client, user, make_user):
 
     # Deleting the workout moves it back out.
     await client.delete(f"/api/v1/workouts/{wid}", headers=user["headers"])
-    assert "workouts" in changed(s7, await _state(client, user))
+    assert {"workouts", "activity"} <= changed(s7, await _state(client, user))
 
     # Someone else's changes don't touch yours.
     other = await make_user(email="t1000@example.com")

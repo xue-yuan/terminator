@@ -149,3 +149,57 @@ async def test_exercise_list_after_workouts(client, user):
     assert bench["last_performed_at"] == "2026-11-08T10:00:00Z"
     assert bench["last_sets"] == [{"reps": 3, "weight": 110, "rpe": None, "kind": "working"}]
     assert by_name["Plank"]["times_performed"] == 0
+
+
+async def test_activity_lists_every_workout_in_brief(client, user, make_user):
+    h = user["headers"]
+    url = "/api/v1/workouts/activity"
+    assert (await client.get(url, headers=h)).json() == []
+
+    older = workout(
+        performed_at="2026-11-01T10:00:00Z",
+        items=[
+            {
+                "exercise_name": "Squat",
+                "sets": [
+                    {"reps": 5, "weight": 60, "kind": "warmup"},
+                    {"reps": 5, "weight": 100},
+                    {"reps": 5, "weight": 100},
+                ],
+            },
+            {"exercise_name": "Plank", "sets": []},
+        ],
+    )
+    first = (await client.post("/api/v1/workouts/", json=older, headers=h)).json()
+    empty = (
+        await client.post(
+            "/api/v1/workouts/",
+            json=workout(name=None, performed_at="2026-11-03T10:00:00Z", duration_seconds=None, items=[]),
+            headers=h,
+        )
+    ).json()
+    latest = (await client.post("/api/v1/workouts/", json=workout(), headers=h)).json()
+    # Someone else's workouts are not yours.
+    other = await make_user(email="t1000@example.com")
+    await client.post("/api/v1/workouts/", json=workout(), headers=other["headers"])
+
+    r = await client.get(url, headers=h)
+    assert r.status_code == 200, r.text
+    def brief(w, at, name="Push", duration=3600, sets=0):
+        return {"id": w["id"], "performed_at": at, "name": name, "duration_seconds": duration, "sets": sets}
+
+    assert r.json() == [  # most recent first; warm-ups and empty exercises add no sets
+        brief(latest, "2026-11-10T00:30:00Z", sets=3),
+        brief(empty, "2026-11-03T10:00:00Z", name=None, duration=None),
+        brief(first, "2026-11-01T10:00:00Z", sets=2),
+    ]
+
+    # An edit shows up; a deleted workout is gone.
+    await client.put(f"/api/v1/workouts/{first['id']}", json=older | {"items": older["items"][:1] * 2}, headers=h)
+    await client.delete(f"/api/v1/workouts/{empty['id']}", headers=h)
+    assert [(a["id"], a["sets"]) for a in (await client.get(url, headers=h)).json()] == [
+        (latest["id"], 3),
+        (first["id"], 4),
+    ]
+
+    assert (await client.get(url)).status_code == 401
