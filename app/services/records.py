@@ -23,7 +23,10 @@ from app.services.exercise import KG_PER_LB
 
 # The kg factor is written into the SQL: as a bind parameter next to `ELSE 1`
 # Postgres would type it as an integer and silently turn it into 0.
-_PR_FLAGS = text(f"""
+def _pr_query(exercise_filter: str, select: str) -> str:
+    """Every working set of the user's (narrowed by `exercise_filter`) flagged
+    with the records it broke, as `flagged`; `select` picks from it."""
+    return f"""
 WITH sets AS (
     SELECT s.id, i.exercise_id, s.reps,
            s.weight * CASE WHEN i.weight_unit = 'lb' THEN {KG_PER_LB} ELSE 1.0 END AS kg,
@@ -31,7 +34,7 @@ WITH sets AS (
     FROM workout_sets s
     JOIN workout_items i ON i.id = s.item_id
     JOIN workouts w ON w.id = i.workout_id
-    WHERE w.user_id = :user_id AND i.exercise_id IN :exercise_ids AND s.kind = 'working' AND s.reps > 0
+    WHERE w.user_id = :user_id {exercise_filter} AND s.kind = 'working' AND s.reps > 0
 ), scored AS (
     SELECT *, CASE WHEN reps = 1 THEN kg ELSE kg * (1 + reps / 30.0) END AS e1rm FROM sets
 ), compared AS (
@@ -47,14 +50,26 @@ WITH sets AS (
         PARTITION BY exercise_id ORDER BY performed_at, workout_id, item_order, set_order
         ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
     )
+), flagged AS (
+    SELECT id,
+           coalesce(done_before AND kg > 0 AND kg > best_kg, false) AS weight,
+           coalesce(done_before AND kg > 0 AND reps <= 12 AND e1rm > best_e1rm, false) AS e1rm,
+           coalesce(done_before AND kg = 0 AND reps > best_reps, false) AS reps
+    FROM compared
 )
-SELECT id,
-       coalesce(done_before AND kg > 0 AND kg > best_kg, false) AS weight,
-       coalesce(done_before AND kg > 0 AND reps <= 12 AND e1rm > best_e1rm, false) AS e1rm,
-       coalesce(done_before AND kg = 0 AND reps > best_reps, false) AS reps
-FROM compared
-WHERE id IN :set_ids
-""").bindparams(bindparam("exercise_ids", expanding=True), bindparam("set_ids", expanding=True))
+{select}
+"""
+
+
+_PR_FLAGS = text(
+    _pr_query("AND i.exercise_id IN :exercise_ids", "SELECT * FROM flagged WHERE id IN :set_ids")
+).bindparams(bindparam("exercise_ids", expanding=True), bindparam("set_ids", expanding=True))
+_PR_SETS = text(_pr_query("", "SELECT id FROM flagged WHERE weight OR e1rm OR reps"))
+
+
+async def pr_set_ids(db: AsyncSession, user_id: int) -> set[int]:
+    """Ids of all the user's sets that broke a record (of any kind), over the whole history."""
+    return set((await db.execute(_PR_SETS, {"user_id": user_id})).scalars())
 
 
 async def mark_prs(db: AsyncSession, user_id: int, workouts: Iterable[Workout]) -> None:

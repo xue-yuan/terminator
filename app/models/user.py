@@ -16,3 +16,5 @@ class User(Base):
     active_plan_id: Mapped[int | None] = mapped_column(
         ForeignKey("plans.id", ondelete="SET NULL", use_alter=True, name="users_active_plan_id_fkey")
     )
+    # The title shown under the name: an unlocked achievement tier, "<achievement>:<target>".
+    title: Mapped[str | None] = mapped_column(String(60))

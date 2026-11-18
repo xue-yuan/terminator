@@ -19,6 +19,7 @@ from app.models.plan import Plan, PlanDay, PlanExercise
 from app.models.spotify import SpotifyLink
 from app.models.user import User
 from app.models.workout import Workout
+from app.services import achievements
 from app.services.catalog import CatalogService
 
 
@@ -82,6 +83,9 @@ class SyncService:
             # The exercise library is shared: the same for everyone.
             "catalog": _digest(catalog),
             "summary": _digest(workouts, plans, user.active_plan_id),
+            # XP, levels and achievements come from workouts, weigh-ins and the muscle
+            # groups of exercises (yours and the library's), and the rules themselves.
+            "progress": _digest(workouts, exercises, body_weights, catalog, user.title, achievements.VERSION),
             "spotify": _digest(bool(settings.SPOTIFY_CLIENT_ID), spotify),
             "user": _digest(user.email, user.full_name, user.active_plan_id, settings.is_admin(user.email)),
         }

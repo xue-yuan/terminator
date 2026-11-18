@@ -6,7 +6,7 @@ import pytest
 
 from app.core.config import settings
 from app.schemas.catalog import CatalogIn
-from app.schemas.exercise import MuscleGroup
+from app.schemas.exercise import LEGACY_GROUPS, MuscleGroup, legacy_group
 
 pytestmark = pytest.mark.anyio
 
@@ -80,18 +80,18 @@ async def test_bad_entries_are_refused(client, admin):
     for body in (
         {"name": "", "muscle_group": "chest"},
         {"name": "Squat"},  # muscle group is required
-        {"name": "Squat", "muscle_group": "glutes"},
-        {"name": "Squat", "muscle_group": "legs", "zh": "x" * 101},
+        {"name": "Squat", "muscle_group": "wings"},
+        {"name": "Squat", "muscle_group": "quads", "zh": "x" * 101},
     ):
         assert (await client.post(URL, json=body, headers=admin["headers"])).status_code == 422, body
-    r = await client.put(f"{URL}/999", json={"name": "Squat", "muscle_group": "legs"}, headers=admin["headers"])
+    r = await client.put(f"{URL}/999", json={"name": "Squat", "muscle_group": "quads"}, headers=admin["headers"])
     assert r.status_code == 404
 
 
 async def test_only_admins_change_the_library(client, admin, member):
     user = member
-    entry = (await client.post(URL, json={"name": "Squat", "muscle_group": "legs"}, headers=admin["headers"])).json()
-    body = {"name": "Back Squat", "muscle_group": "legs"}
+    entry = (await client.post(URL, json={"name": "Squat", "muscle_group": "quads"}, headers=admin["headers"])).json()
+    body = {"name": "Back Squat", "muscle_group": "quads"}
     assert (await client.post(URL, json=body, headers=user["headers"])).status_code == 403
     assert (await client.put(f"{URL}/{entry['id']}", json=body, headers=user["headers"])).status_code == 403
     assert (await client.delete(f"{URL}/{entry['id']}", headers=user["headers"])).status_code == 403
@@ -102,11 +102,11 @@ async def test_every_change_moves_the_sync_fingerprint(client, admin):
     async def fingerprint():
         return (await client.get("/api/v1/sync/state", headers=admin["headers"])).json()["catalog"]
 
-    first = (await client.post(URL, json={"name": "Deadlift", "muscle_group": "back"}, headers=admin["headers"])).json()
+    first = (await client.post(URL, json={"name": "Deadlift", "muscle_group": "lower_back"}, headers=admin["headers"])).json()
     seen = [await fingerprint()]
-    entry = (await client.post(URL, json={"name": "Squat", "muscle_group": "legs"}, headers=admin["headers"])).json()
+    entry = (await client.post(URL, json={"name": "Squat", "muscle_group": "quads"}, headers=admin["headers"])).json()
     seen.append(await fingerprint())
-    await client.put(f"{URL}/{entry['id']}", json={"name": "Squat", "zh": "深蹲", "muscle_group": "legs"}, headers=admin["headers"])
+    await client.put(f"{URL}/{entry['id']}", json={"name": "Squat", "zh": "深蹲", "muscle_group": "quads"}, headers=admin["headers"])
     seen.append(await fingerprint())
     await client.delete(f"{URL}/{first['id']}", headers=admin["headers"])
     seen.append(await fingerprint())
@@ -125,6 +125,6 @@ def test_the_migrated_catalog_is_valid():
     for name, zh, aka, muscle in migration.SEED:
         entry = CatalogIn(name=name, zh=zh, aka=aka, muscle_group=muscle)
         assert (entry.name, entry.zh, entry.aka) == (name, zh, aka), name  # stored as written
-        # "arms" was split into biceps and triceps later (e1f3b5c7a9d2, tested in test_muscle_groups.py).
-        assert entry.muscle_group in (("biceps", "triceps") if muscle == "arms" else (muscle,)), name
+        # Old groups were split later (e1f3b5c7a9d2, b8c4e7f1a2d6; tested in test_muscle_groups.py).
+        assert entry.muscle_group == (legacy_group(muscle, name, zh, aka) if muscle in LEGACY_GROUPS else muscle), name
         assert zh and entry.muscle_group in get_args(MuscleGroup), name

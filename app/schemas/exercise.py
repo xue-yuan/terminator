@@ -7,30 +7,76 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validat
 from app.schemas.common import Name, OptionalText, WeightUnit
 from app.schemas.workout import SetOut
 
-MuscleGroup = Literal["chest", "back", "legs", "shoulders", "biceps", "triceps", "core", "other"]
+MuscleGroup = Literal[
+    "chest",
+    "lats",
+    "upper_back",
+    "lower_back",
+    "front_delts",
+    "side_delts",
+    "rear_delts",
+    "biceps",
+    "triceps",
+    "quads",
+    "hamstrings",
+    "glutes",
+    "calves",
+    "core",
+    "other",
+]
 
-# "arms" was one group until biceps and triceps were split (migration
-# e1f3b5c7a9d2, which files existing rows the same way). Older app versions and
-# backups still send it: the exercise's name says which one it is.
-_TRICEPS = ("tricep", "pushdown", "push-down", "skull", "extension", "kickback", "close-grip", "dip", "三頭", "下壓", "伸展", "窄握", "撐體")
-_BICEPS = ("curl", "bicep", "彎舉", "二頭")
+# Groups that were split later: "arms" into biceps and triceps (migration
+# e1f3b5c7a9d2), then "back", "legs" and "shoulders" into the muscles below
+# (b8c4e7f1a2d6). The migrations filed existing rows with these same rules;
+# older app versions and backups still send the old names, and the exercise's
+# name says where it goes. Per old group: (new group, words in the name) tried
+# in order, then the fallback.
+LEGACY_GROUPS: dict[str, tuple[list[tuple[str, tuple[str, ...]]], str]] = {
+    "arms": (
+        [
+            ("triceps", ("tricep", "pushdown", "push-down", "skull", "extension", "kickback", "close-grip", "dip", "三頭", "下壓", "伸展", "窄握", "撐體")),
+            ("biceps", ("curl", "bicep", "彎舉", "二頭")),
+        ],
+        "other",
+    ),
+    "back": (
+        [
+            ("rear_delts", ("face pull", "facepull", "rear delt", "臉拉", "後三角")),
+            ("lower_back", ("deadlift", "rack pull", "back extension", "hyperextension", "good morning", "硬舉", "背伸展", "山羊挺身", "羅馬椅", "下背", "早安")),
+            ("lats", ("pull-up", "pullup", "pull up", "chin-up", "chinup", "chin up", "pulldown", "pull-down", "pull down", "lat pull", "lats", "pullover", "引體", "下拉", "背闊", "直臂")),
+        ],
+        "upper_back",
+    ),
+    "shoulders": (
+        [
+            ("rear_delts", ("rear", "reverse fly", "reverse pec", "face pull", "後三角", "反向飛鳥", "臉拉", "後束")),
+            ("side_delts", ("lateral", "side raise", "upright", "y raise", "側平舉", "側三角", "直立划船", "側束")),
+        ],
+        "front_delts",
+    ),
+    "legs": (
+        [
+            ("calves", ("calf", "calves", "提踵", "小腿")),
+            ("hamstrings", ("romanian", "rdl", "leg curl", "hamstring", "glute-ham", "nordic", "good morning", "stiff-leg", "stiff leg", "腿彎舉", "腿後", "羅馬尼亞", "直腿", "早安")),
+            ("glutes", ("hip thrust", "glute", "abduct", "adduct", "kickback", "sumo", "bridge", "臀", "外展", "內收", "相撲", "髖")),
+        ],
+        "quads",
+    ),
+}
 
 
-def arms_group(*names: str | None) -> str:
-    """Biceps or triceps for an exercise once filed under "arms" (other if neither fits)."""
+def legacy_group(old: str, *names: str | None) -> str:
+    """Where an exercise once filed under an old group (arms, back, legs, shoulders) goes now."""
+    rules, fallback = LEGACY_GROUPS[old]
     text = " ".join(n for n in names if n).lower()
-    if any(word in text for word in _TRICEPS):
-        return "triceps"
-    if any(word in text for word in _BICEPS):
-        return "biceps"
-    return "other"
+    return next((group for group, words in rules if any(word in text for word in words)), fallback)
 
 
-def file_legacy_arms(value: object, info: ValidationInfo) -> object:
-    """A field validator (mode="before") for muscle_group: "arms" becomes biceps or triceps."""
-    if value != "arms":
+def file_legacy_group(value: object, info: ValidationInfo) -> object:
+    """A field validator (mode="before") for muscle_group: an old group becomes the muscle it now is."""
+    if value not in LEGACY_GROUPS:
         return value
-    return arms_group(info.data.get("name"), info.data.get("zh"), info.data.get("aka"))
+    return legacy_group(value, info.data.get("name"), info.data.get("zh"), info.data.get("aka"))
 
 Reps = Annotated[int, Field(ge=1, le=100)] | None
 
@@ -46,7 +92,7 @@ class ExerciseIn(BaseModel):
     increment: Annotated[float, Field(gt=0, le=50)] | None = None
     rest_seconds: Annotated[int, Field(ge=0, le=1800)] | None = None
 
-    _arms = field_validator("muscle_group", mode="before")(file_legacy_arms)
+    _legacy = field_validator("muscle_group", mode="before")(file_legacy_group)
 
     @model_validator(mode="after")
     def _reps_range(self) -> "ExerciseIn":
@@ -75,7 +121,7 @@ class ExerciseOut(BaseModel):
     rep_min: int | None
     rep_max: int | None
 
-    _arms = field_validator("muscle_group", mode="before")(file_legacy_arms)
+    _legacy = field_validator("muscle_group", mode="before")(file_legacy_group)
     increment: float | None
     rest_seconds: int | None
     updated_at: datetime

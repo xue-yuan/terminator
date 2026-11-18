@@ -34,6 +34,7 @@ async def test_fingerprints_move_only_with_their_data(client, user, make_user):
         "body_weights",
         "catalog",
         "summary",
+        "progress",
         "spotify",
         "user",
     }
@@ -43,18 +44,18 @@ async def test_fingerprints_move_only_with_their_data(client, user, make_user):
     wid = uuid.uuid4()
     assert (await client.put(f"/api/v1/workouts/{wid}", json=workout(), headers=user["headers"])).status_code == 201
     s1 = await _state(client, user)
-    assert changed(s0, s1) == {"workouts", "exercises", "activity", "plans", "summary"}
+    assert changed(s0, s1) == {"workouts", "exercises", "activity", "plans", "summary", "progress"}
 
     # Editing it again moves them again (same row count, later update).
     await client.put(f"/api/v1/workouts/{wid}", json=workout(notes="felt heavy"), headers=user["headers"])
     s2 = await _state(client, user)
     assert {"workouts", "activity", "summary"} <= changed(s1, s2)
 
-    # A weigh-in only moves body weights.
+    # A weigh-in moves body weights (and progress: there are weigh-in titles).
     entry = {"measured_at": "2026-11-10T07:00:00Z", "weight": 80, "unit": "kg"}
     await client.put(f"/api/v1/body-weights/{uuid.uuid4()}", json=entry, headers=user["headers"])
     s3 = await _state(client, user)
-    assert changed(s2, s3) == {"body_weights"}
+    assert changed(s2, s3) == {"body_weights", "progress"}
 
     # Plans: creating one, then renaming it, then editing a day's exercises in place.
     body = {"name": "PPL", "days": [{"name": "Push", "exercises": [{"exercise_name": "Squat"}]}]}

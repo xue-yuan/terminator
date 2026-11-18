@@ -15,3 +15,6 @@ __pycache__/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# The plain-Chinese achievements doc is kept out of git (app/services/achievements.py follows it)
+ACHIEVEMENTS.md

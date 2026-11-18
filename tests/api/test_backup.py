@@ -10,7 +10,7 @@ async def seed(client, user) -> None:
     squat = str(uuid.uuid4())
     await client.put(
         f"/api/v1/exercises/{squat}",
-        json={"name": "Squat", "muscle_group": "legs", "notes": "belt", "rep_min": 5, "rep_max": 8, "increment": 5},
+        json={"name": "Squat", "muscle_group": "quads", "notes": "belt", "rep_min": 5, "rep_max": 8, "increment": 5},
         headers=h,
     )
     for day, weight in ((1, 100), (8, 105)):
