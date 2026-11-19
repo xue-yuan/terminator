@@ -142,6 +142,18 @@ async def test_consistency_rules(client, user):
     assert unlocked(p, "comeback") == [1]
 
 
+async def test_a_comeback_takes_more_than_14_days_off(client, user):
+    h = user["headers"]
+    squat = [{"exercise_name": "Squat", "sets": sets(1)}]
+    await workout(client, h, "2026-11-01T18:00:00Z", squat)
+    await workout(client, h, "2026-11-16T18:00:00Z", squat)  # 2nd to 15th off: 14 days, not more
+    p = await progress(client, h)
+    assert achievement(p, "comeback")["value"] == 0
+    await workout(client, h, "2026-12-02T18:00:00Z", squat)  # 17th to 1st off: 15 days
+    p = await progress(client, h)
+    assert achievement(p, "comeback")["value"] == 1 and unlocked(p, "comeback") == [1]
+
+
 async def test_muscle_rules(client, user):
     h = user["headers"]
     groups = {

@@ -106,7 +106,7 @@ ACHIEVEMENTS: list[Achievement] = [
     ]),
     _a("comeback", "consistency", "Comeback", "rotate-ccw", "comebacks", [
         (1, "bronze", 150, "Comeback Kid", "王者歸來", "Get back to it after more than two weeks off."),
-    ], {"gap_days": 14}),
+    ], {"rest_days": 14}),  # days without a workout in between: 15 or more
     # ---- level (no XP: levelling up must not level you up) ----
     _a("level", "level", "Level", "star", "level", [
         (5, "bronze", 0, "Apprentice", "學徒", "Reach level 5."),

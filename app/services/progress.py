@@ -175,7 +175,8 @@ class Replay:
             case "max_workouts_in_week":
                 v[a.id] = max(v[a.id], self.week_counts[_week(day)])
             case "comebacks":
-                v[a.id] += gap is not None and gap > p["gap_days"]
+                # gap counts both workout days: the 1st to the 16th is 14 days off.
+                v[a.id] += gap is not None and gap - 1 > p["rest_days"]
             case "prs":
                 v[a.id] = self.prs
             case "bodyweight_ratio":
