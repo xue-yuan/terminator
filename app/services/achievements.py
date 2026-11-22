@@ -31,6 +31,7 @@ CATEGORIES = [
     ("variety", "Variety"),
     ("habits", "Habits"),
     ("muscles", "Muscles"),
+    ("special", "Special"),
 ]
 
 # Body parts and their muscle groups (the frontend's REGIONS in lib/exercises.js).
@@ -47,7 +48,7 @@ REGIONS = {
 @dataclass(frozen=True)
 class Tier:
     target: float
-    medal: str  # bronze | silver | gold | platinum
+    medal: str  # bronze | silver | gold | platinum | special (a granted title)
     xp: int
     title: str
     zh: str
@@ -226,9 +227,18 @@ ACHIEVEMENTS: list[Achievement] = [
     _a("chicken_legs", "muscles", "Chicken Legs", "drumstick", "chicken_legs", [
         (1, "bronze", 50, "Chicken Legs", "鳥仔腳", "Over 4 weeks, train chest and arms 3× as much as legs."),
     ], {"days": 28, "ratio": 3, "min_sets": 30}, hidden=True),
+    # ---- special: given by hand to one person (a row in achievement_unlocks), never
+    # earned from the history. Nobody else even sees that it exists. ----
+    _a("gym_squatter", "special", "The Longest Workout", "tent", "granted", [
+        (1, "special", 0, "Gym Squatter", "健身房釘子戶", "Stayed for 7 h 40 min in one workout."),
+    ]),
+    _a("creator", "special", "Made This App", "crown", "granted", [
+        (1, "special", 0, "The Creator", "造物主", "Built the app everyone here trains with."),
+    ]),
 ]
 
 BY_ID = {a.id: a for a in ACHIEVEMENTS}
+GRANTED = tuple(a.id for a in ACHIEVEMENTS if a.metric == "granted")
 
 # Moves whenever a definition does, so clients refetch (GET /sync/state).
 VERSION = hashlib.sha1(

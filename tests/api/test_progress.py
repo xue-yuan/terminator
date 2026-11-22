@@ -3,12 +3,12 @@ banked as earned, never taken back."""
 
 import re
 import uuid
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
-from app.services.achievements import ACHIEVEMENTS, RULES, level_for, xp_for_level
+from app.services.achievements import ACHIEVEMENTS, GRANTED, RULES, level_for, xp_for_level
 
 pytestmark = pytest.mark.anyio
 
@@ -35,8 +35,8 @@ async def workout(client, h, at: str, items: list[dict], duration: int | None = 
     return id_
 
 
-async def progress(client, h, tz: str = "UTC") -> dict:
-    r = await client.get(URL, params={"tz": tz}, headers=h)
+async def progress(client, h, tz: str = "UTC", **params) -> dict:
+    r = await client.get(URL, params={"tz": tz, **params}, headers=h)
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -54,7 +54,7 @@ async def test_a_new_user_starts_at_level_1_with_secrets_kept(client, user):
     assert (p["xp"], p["level"], p["level_xp"], p["next_level_xp"], p["title"]) == (0, 1, 0, 100, None)
     assert p["rules"] == RULES
     assert [c["id"] for c in p["categories"]][:2] == ["consistency", "level"]
-    assert len(p["achievements"]) == len(ACHIEVEMENTS)
+    assert len(p["achievements"]) == len(ACHIEVEMENTS) - len(GRANTED)  # nothing given to you by hand
     assert not any(t["unlocked_at"] for a in p["achievements"] for t in a["tiers"])
     secret = achievement(p, "new_year")
     assert secret["hidden"] and secret["name"] is None and secret["tiers"][0]["title"] is None
@@ -275,6 +275,57 @@ async def test_wearing_a_title(client, user):
     assert (await client.put(f"{URL}/title", json={"title": "nonsense"}, headers=h)).status_code == 404
     assert (await client.put(f"{URL}/title", json={"title": None}, headers=h)).json() is None
     assert (await progress(client, h))["title"] is None
+
+
+async def test_a_granted_title_is_only_for_whoever_got_it(client, make_user):
+    from app.models.progress import AchievementUnlock
+    from tests.conftest import TestSession
+
+    granted = await make_user("kyrie@example.com", "Kyrie")
+    kyrie = granted["headers"]
+    other = (await make_user("john@example.com", "John"))["headers"]
+    long_one = await workout(
+        client, kyrie, "2026-11-22T03:41:00Z", [{"exercise_name": "Squat", "sets": sets(4)}], duration=27628
+    )
+    before = await progress(client, kyrie)
+    assert "gym_squatter" not in {a["id"] for a in before["achievements"]}
+
+    async def state(h):
+        return (await client.get("/api/v1/sync/state", headers=h)).json()["progress"]
+
+    fingerprint, others = await state(kyrie), await state(other)
+    async with TestSession() as s:  # what granting it is: a row, by hand
+        s.add(
+            AchievementUnlock(
+                user_id=granted["id"], achievement="gym_squatter", target=1, unlocked_at=datetime.now(UTC), workout_id=long_one
+            )
+        )
+        await s.commit()
+    assert await state(kyrie) != fingerprint  # coming back to the app finds it
+    assert await state(other) == others
+
+    # An older app (no `granted`) never hears of it, so it can't toast it and note it seen.
+    assert "gym_squatter" not in {a["id"] for a in (await progress(client, kyrie))["achievements"]}
+    p = await progress(client, kyrie, granted="true")
+    gift = achievement(p, "gym_squatter")
+    assert gift["category"] == "special" and gift["name"] == "The Longest Workout" and not gift["hidden"]
+    assert gift["tiers"][0] | {"unlocked_at": None} == {
+        "target": 1,
+        "medal": "special",
+        "xp": 0,
+        "title": "Gym Squatter",
+        "description": "Stayed for 7 h 40 min in one workout.",
+        "unlocked_at": None,
+        "workout_id": long_one,
+    }
+    assert p["xp"] == before["xp"]
+    r = await client.put(f"{URL}/title", json={"title": "gym_squatter:1"}, headers=kyrie)
+    assert r.json() == {"key": "gym_squatter:1", "title": "Gym Squatter", "medal": "special"}
+
+    # Nobody else sees it, earns it or can wear it.
+    await workout(client, other, "2026-11-22T03:41:00Z", [{"exercise_name": "Squat", "sets": sets(4)}], duration=27628)
+    assert "gym_squatter" not in {a["id"] for a in (await progress(client, other, granted="true"))["achievements"]}
+    assert (await client.put(f"{URL}/title", json={"title": "gym_squatter:1"}, headers=other)).status_code == 404
 
 
 async def test_needs_sign_in_and_a_real_time_zone(client, user):

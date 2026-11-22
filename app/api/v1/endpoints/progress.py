@@ -14,6 +14,7 @@ async def read_progress(
     user: CurrentUser,
     service: ProgressSvc,
     tz: str = Query("UTC", description="IANA time zone for weeks, days and times of day"),
+    granted: bool = Query(False, description="Include titles given to you by hand (for apps that can show them)"),
 ) -> ProgressOut:
     """Your XP, level, title and achievements, from your whole history. Newly
     earned XP and tiers are banked as they're found; nothing earned is ever taken back."""
@@ -21,7 +22,7 @@ async def read_progress(
         zone = ZoneInfo(tz)
     except (ZoneInfoNotFoundError, ValueError):
         raise HTTPException(status_code=422, detail=f"Unknown time zone: {tz}") from None
-    return await service.progress(user, zone)
+    return await service.progress(user, zone, granted=granted)
 
 
 @router.put("/title", response_model=TitleOut | None)

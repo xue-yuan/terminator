@@ -237,8 +237,8 @@ class Replay:
                 legs = sum(lg for _, _, lg in window)
                 if upper >= p["min_sets"] and upper >= p["ratio"] * legs:
                     v[a.id] = 1
-            case "level" | "body_weight_entries":
-                pass  # levels come from the XP total; weigh-ins from add_weigh_in
+            case "level" | "body_weight_entries" | "granted":
+                pass  # levels come from the XP total, weigh-ins from add_weigh_in, granted titles by hand
             case _:
                 raise ValueError(f"unknown metric {a.metric}")
 
@@ -364,7 +364,10 @@ class ProgressService:
         rows = (await self.db.execute(select(AchievementUnlock).where(AchievementUnlock.user_id == user_id))).scalars()
         return {(u.achievement, u.target): u for u in rows}
 
-    async def progress(self, user: User, tz: ZoneInfo) -> ProgressOut:
+    async def progress(self, user: User, tz: ZoneInfo, granted: bool = False) -> ProgressOut:
+        """`granted`: list the titles given to this user by hand too. Older app builds
+        don't ask: they'd announce one with a toast and note it seen, so the build
+        that gives it a card of its own would never show it."""
         replay = await self._replay(user, tz)
         await self._bank(user.id, replay)
 
@@ -389,6 +392,8 @@ class ProgressService:
 
         achievements = []
         for a in ACHIEVEMENTS:
+            if a.metric == "granted" and not (granted and any((a.id, t.target) in stored for t in a.tiers)):
+                continue  # someone else's (not even a secret to you), or an app that can't show it
             value = level if a.metric == "level" else replay.values[a.id]
             tiers = [
                 TierOut(

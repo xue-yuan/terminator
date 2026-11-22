@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.models.body_weight import BodyWeight
 from app.models.exercise import Exercise
 from app.models.plan import Plan, PlanDay, PlanExercise
+from app.models.progress import AchievementUnlock
 from app.models.spotify import SpotifyLink
 from app.models.user import User
 from app.models.workout import Workout
@@ -69,6 +70,12 @@ class SyncService:
         body_weights = await self._count_and_latest(BodyWeight, user.id)
         plans = await self._plans(user.id)
         catalog = await CatalogService(self.db).fingerprint()
+        # Titles given by hand: no workout moves when one arrives, so it counts by itself.
+        granted = await self.db.scalar(
+            select(func.count()).where(
+                AchievementUnlock.user_id == user.id, AchievementUnlock.achievement.in_(achievements.GRANTED)
+            )
+        )
         spotify = (
             await self.db.execute(select(SpotifyLink.updated_at).where(SpotifyLink.user_id == user.id))
         ).scalar_one_or_none()
@@ -84,8 +91,10 @@ class SyncService:
             "catalog": _digest(catalog),
             "summary": _digest(workouts, plans, user.active_plan_id),
             # XP, levels and achievements come from workouts, weigh-ins and the muscle
-            # groups of exercises (yours and the library's), and the rules themselves.
-            "progress": _digest(workouts, exercises, body_weights, catalog, user.title, achievements.VERSION),
+            # groups of exercises (yours and the library's), the rules themselves, and titles given by hand.
+            "progress": _digest(
+                workouts, exercises, body_weights, catalog, user.title, achievements.VERSION, granted
+            ),
             "spotify": _digest(bool(settings.SPOTIFY_CLIENT_ID), spotify),
             "user": _digest(user.email, user.full_name, user.active_plan_id, settings.is_admin(user.email)),
         }
