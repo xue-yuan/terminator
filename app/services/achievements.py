@@ -229,8 +229,9 @@ ACHIEVEMENTS: list[Achievement] = [
     ], {"days": 28, "ratio": 3, "min_sets": 30}, hidden=True),
     # ---- special: given by hand to one person (a row in achievement_unlocks), never
     # earned from the history. Nobody else even sees that it exists. ----
+    # The id is what the granted row names (it was called Gym Squatter at first): keep it.
     _a("gym_squatter", "special", "The Longest Workout", "tent", "granted", [
-        (1, "special", 0, "Gym Squatter", "健身房釘子戶", "Stayed for 7 h 40 min in one workout."),
+        (1, "special", 0, "7-Hour Legend", "七小時傳說", "Stayed for 7 h 40 min in one workout."),
     ]),
     _a("creator", "special", "Made This App", "crown", "granted", [
         (1, "special", 0, "The Creator", "造物主", "Built the app everyone here trains with."),

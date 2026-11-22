@@ -313,14 +313,14 @@ async def test_a_granted_title_is_only_for_whoever_got_it(client, make_user):
         "target": 1,
         "medal": "special",
         "xp": 0,
-        "title": "Gym Squatter",
+        "title": "7-Hour Legend",
         "description": "Stayed for 7 h 40 min in one workout.",
         "unlocked_at": None,
         "workout_id": long_one,
     }
     assert p["xp"] == before["xp"]
     r = await client.put(f"{URL}/title", json={"title": "gym_squatter:1"}, headers=kyrie)
-    assert r.json() == {"key": "gym_squatter:1", "title": "Gym Squatter", "medal": "special"}
+    assert r.json() == {"key": "gym_squatter:1", "title": "7-Hour Legend", "medal": "special"}
 
     # Nobody else sees it, earns it or can wear it.
     await workout(client, other, "2026-11-22T03:41:00Z", [{"exercise_name": "Squat", "sets": sets(4)}], duration=27628)
