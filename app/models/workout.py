@@ -90,6 +90,9 @@ class WorkoutSet(Base):
     reps: Mapped[int]
     weight: Mapped[float] = mapped_column(Float)
     rpe: Mapped[float | None] = mapped_column(Float)
+    # Timed and cardio exercises (app/schemas/common.py LogType): reps are 0.
+    duration_seconds: Mapped[int | None]
+    distance_m: Mapped[float | None] = mapped_column(Float)
     # Warm-up sets don't count towards volume, set counts or records.
     kind: Mapped[str] = mapped_column(String(10), default="working", server_default="working")
     order: Mapped[int] = mapped_column(default=0, server_default="0")

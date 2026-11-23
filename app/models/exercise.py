@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Float, ForeignKey, Index, String, Text, Uuid, func
+from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, Index, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -18,11 +18,15 @@ class Exercise(Base):
     """
 
     __tablename__ = "exercises"
+    __table_args__ = (CheckConstraint("log_type IN ('reps', 'time', 'cardio')", name="exercises_log_type_check"),)
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     name: Mapped[str] = mapped_column(String(100))
     muscle_group: Mapped[str | None] = mapped_column(String(20))
+    # What a set is: weight × reps, a time, or a time and a distance (LogType).
+    # None: the library's for this name, else weight × reps.
+    log_type: Mapped[str | None] = mapped_column(String(10))
     # Shown while logging, e.g. seat height or grip.
     notes: Mapped[str | None] = mapped_column(Text)
     # Target rep range; drives the "add weight next time" suggestion.

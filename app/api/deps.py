@@ -13,9 +13,11 @@ from app.services.auth import AuthService
 from app.services.backup import BackupService
 from app.services.body_weight import BodyWeightService
 from app.services.catalog import CatalogService
+from app.services.community import CommunityService
 from app.services.exercise import ExerciseService
 from app.services.plan import PlanService
 from app.services.progress import ProgressService
+from app.services.recap import RecapService
 from app.services.spotify import SpotifyService
 from app.services.summary import SummaryService
 from app.services.workout import WorkoutService
@@ -105,6 +107,14 @@ def _progress_service(db: DB) -> ProgressService:
     return ProgressService(db)
 
 
+def _recap_service(db: DB) -> RecapService:
+    return RecapService(db)
+
+
+def _community_service(db: DB) -> CommunityService:
+    return CommunityService(db)
+
+
 AuthSvc = Annotated[AuthService, Depends(_auth_service)]
 WorkoutSvc = Annotated[WorkoutService, Depends(_workout_service)]
 ExerciseSvc = Annotated[ExerciseService, Depends(_exercise_service)]
@@ -116,3 +126,5 @@ AccessSvc = Annotated[AccessService, Depends(_access_service)]
 CatalogSvc = Annotated[CatalogService, Depends(_catalog_service)]
 SpotifySvc = Annotated[SpotifyService, Depends(_spotify_service)]
 ProgressSvc = Annotated[ProgressService, Depends(_progress_service)]
+RecapSvc = Annotated[RecapService, Depends(_recap_service)]
+CommunitySvc = Annotated[CommunityService, Depends(_community_service)]

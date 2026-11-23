@@ -81,7 +81,7 @@ async def test_list_reports_last_sets_and_records_compared_in_kg(client, user):
     await put(client, user, workout("2026-11-09T08:00:00Z", item("Dips", (0, 12), (0, 15))))
     ex = await exercises(client, user)
     bench = ex["Bench Press"]
-    assert (bench["last_unit"], bench["last_sets"]) == ("lb", [{"weight": 225, "reps": 5, "rpe": None, "kind": "working"}])
+    assert (bench["last_unit"], bench["last_sets"]) == ("lb", [{"weight": 225, "reps": 5, "rpe": None, "kind": "working", "duration_seconds": None, "distance_m": None}])
     # 225 lb = 102.1 kg beats 100 kg
     assert (bench["best_weight"]["weight"], bench["best_weight"]["weight_unit"]) == (225, "lb")
     # 100 kg x 8 (est. 126.7 kg) beats 225 lb x 5 (est. 119.1 kg); 60 x 15 is past the 12-rep cutoff
@@ -131,8 +131,8 @@ async def test_progress_is_oldest_first_and_scoped(client, user, make_user):
     assert [s["workout_id"] for s in body["sessions"]] == [w1["id"], w2["id"]]
     assert [s["weight_unit"] for s in body["sessions"]] == ["kg", "lb"]
     assert body["sessions"][0]["sets"] == [
-        {"weight": 100, "reps": 5, "rpe": None, "kind": "working"},
-        {"weight": 102.5, "reps": 3, "rpe": None, "kind": "working"},
+        {"weight": 100, "reps": 5, "rpe": None, "kind": "working", "duration_seconds": None, "distance_m": None},
+        {"weight": 102.5, "reps": 3, "rpe": None, "kind": "working", "duration_seconds": None, "distance_m": None},
     ]
     theirs_id = theirs["items"][0]["exercise_id"]
     r = await client.get(f"/api/v1/exercises/{theirs_id}/progress", headers=user["headers"])

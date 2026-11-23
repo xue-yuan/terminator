@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
-from app.schemas.common import Name, OptionalText, WeightUnit
+from app.schemas.common import LogType, Name, OptionalText, WeightUnit
 from app.schemas.workout import SetOut
 
 MuscleGroup = Literal[
@@ -22,6 +22,7 @@ MuscleGroup = Literal[
     "glutes",
     "calves",
     "core",
+    "cardio",
     "other",
 ]
 
@@ -86,6 +87,7 @@ class ExerciseIn(BaseModel):
 
     name: Name
     muscle_group: MuscleGroup | None = None
+    log_type: LogType | None = None  # None: the library's for this name, else weight × reps
     notes: OptionalText = None
     rep_min: Reps = None
     rep_max: Reps = None
@@ -107,6 +109,8 @@ class SetRecord(BaseModel):
     weight: float
     reps: int
     weight_unit: WeightUnit
+    duration_seconds: int | None = None
+    distance_m: float | None = None
     performed_at: datetime
     workout_id: UUID
 
@@ -117,6 +121,7 @@ class ExerciseOut(BaseModel):
     id: UUID
     name: str
     muscle_group: MuscleGroup | None
+    log_type: LogType | None
     notes: str | None
     rep_min: int | None
     rep_max: int | None
@@ -134,6 +139,8 @@ class ExerciseOut(BaseModel):
     best_weight: SetRecord | None = None  # heaviest set
     best_e1rm: SetRecord | None = None  # highest estimated 1RM (sets of 1-12 reps)
     best_reps: SetRecord | None = None  # most reps in one set
+    best_duration: SetRecord | None = None  # longest set without a distance (a plank)
+    best_distance: SetRecord | None = None  # longest distance in one set (a run)
 
 
 class ExerciseSession(BaseModel):

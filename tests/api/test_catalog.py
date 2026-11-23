@@ -43,8 +43,16 @@ async def test_admin_adds_edits_and_removes_exercises_everyone_sees(client, admi
         "zh": "下斜推胸機",
         "aka": "機械下胸 下胸機械",
         "muscle_group": "chest",
+        "log_type": "reps",  # the default: weight × reps
     }
     await client.post(URL, json={"name": "Ab Wheel Rollout", "muscle_group": "core"}, headers=admin["headers"])
+    r = await client.post(
+        URL, json={"name": "Rowing Machine", "muscle_group": "cardio", "log_type": "cardio"}, headers=admin["headers"]
+    )
+    assert (r.status_code, r.json()["muscle_group"], r.json()["log_type"]) == (201, "cardio", "cardio")
+    r = await client.post(URL, json={"name": "Sprint", "muscle_group": "cardio", "log_type": "laps"}, headers=admin["headers"])
+    assert r.status_code == 422
+    await client.delete(f"{URL}/{(await client.get(URL, headers=sarah['headers'])).json()[2]['id']}", headers=admin["headers"])
 
     r = await client.get(URL, headers=sarah["headers"])
     assert [e["name"] for e in r.json()] == ["Ab Wheel Rollout", "Decline Chest Press Machine"]  # by name

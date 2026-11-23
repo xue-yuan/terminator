@@ -10,6 +10,7 @@ class BodyWeightIn(BaseModel):
     measured_at: AwareDatetime
     weight: float = Field(gt=0, le=1000)
     unit: WeightUnit
+    body_fat: float | None = Field(default=None, ge=2, le=70)  # percent
 
 
 class BodyWeightOut(BaseModel):
@@ -19,4 +20,5 @@ class BodyWeightOut(BaseModel):
     measured_at: datetime
     weight: float
     unit: WeightUnit
+    body_fat: float | None
     updated_at: datetime

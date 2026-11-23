@@ -23,6 +23,8 @@ class BodyWeight(Base):
     measured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     weight: Mapped[float] = mapped_column(Float)
     unit: Mapped[str] = mapped_column(String(2))
+    # Percent, when the scale (or a caliper) tells.
+    body_fat: Mapped[float | None] = mapped_column(Float)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, server_default=func.now()
     )

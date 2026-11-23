@@ -34,7 +34,7 @@ from app.services.plan import PlanService
 from app.services.workout import WorkoutService
 
 IMPORT_NAMESPACE = uuid5(NAMESPACE_URL, "terminator/import")
-SETTINGS = ("muscle_group", "notes", "rep_min", "rep_max", "increment", "rest_seconds")
+SETTINGS = ("muscle_group", "log_type", "notes", "rep_min", "rep_max", "increment", "rest_seconds")
 
 
 def _plan_in(plan: Plan) -> PlanIn:
@@ -191,7 +191,7 @@ class BackupService:
                 row = BodyWeight(id=entry_id, user_id=user_id)
                 self.db.add(row)
                 existing[entry_id] = row
-            row.measured_at, row.weight, row.unit = e.measured_at, e.weight, e.unit
+            row.measured_at, row.weight, row.unit, row.body_fat = e.measured_at, e.weight, e.unit, e.body_fat
             row.updated_at = utcnow()
         await self.db.commit()
         return len(entries)

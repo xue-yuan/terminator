@@ -11,6 +11,8 @@ class WorkoutSetIn(BaseModel):
     weight: float = Field(ge=0, le=2000)  # 0 = bodyweight
     rpe: float | None = Field(default=None, ge=1, le=10)
     kind: SetKind = "working"
+    duration_seconds: int | None = Field(default=None, ge=0, le=24 * 3600)
+    distance_m: float | None = Field(default=None, ge=0, le=1_000_000)
 
 
 class WorkoutItemIn(BaseModel):
@@ -45,6 +47,8 @@ class SetOut(BaseModel):
     weight: float
     rpe: float | None
     kind: SetKind
+    duration_seconds: int | None = None
+    distance_m: float | None = None
 
 
 class WorkoutSetOut(SetOut):

@@ -38,3 +38,16 @@ async def test_upsert_list_and_delete(client, user, make_user):
 async def test_validation(client, user, bad):
     r = await client.put(f"/api/v1/body-weights/{uuid.uuid4()}", json=entry(1, 80) | bad, headers=user["headers"])
     assert r.status_code == 422
+
+
+async def test_body_fat_is_optional(client, user):
+    h = user["headers"]
+    url = f"/api/v1/body-weights/{uuid.uuid4()}"
+    r = await client.put(url, json=entry(1, 80.4) | {"body_fat": 18.5}, headers=h)
+    assert (r.status_code, r.json()["body_fat"]) == (201, 18.5)
+    r = await client.put(f"/api/v1/body-weights/{uuid.uuid4()}", json=entry(2, 80.1), headers=h)
+    assert r.json()["body_fat"] is None
+    for bad in (1, 80):
+        assert (await client.put(url, json=entry(1, 80.4) | {"body_fat": bad}, headers=h)).status_code == 422
+    backup = (await client.get("/api/v1/export", headers=h)).json()
+    assert sorted(str(b["body_fat"]) for b in backup["body_weights"]) == ["18.5", "None"]

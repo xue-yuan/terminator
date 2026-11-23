@@ -32,7 +32,9 @@ async def test_create_and_read_back(client, user):
     assert body["performed_at"] == "2026-11-10T00:30:00Z"
     assert [i["exercise_name"] for i in body["items"]] == ["Bench Press", "Dips"]
     assert [s["weight"] for s in body["items"][0]["sets"]] == [100, 102.5]
-    assert body["items"][1]["sets"] == [{"reps": 12, "weight": 0, "rpe": None, "kind": "working", "pr": []}]
+    assert body["items"][1]["sets"] == [
+        {"reps": 12, "weight": 0, "rpe": None, "kind": "working", "duration_seconds": None, "distance_m": None, "pr": []}
+    ]
 
     r = await client.get(f"/api/v1/workouts/{body['id']}", headers=user["headers"])
     assert r.status_code == 200
@@ -147,7 +149,7 @@ async def test_exercise_list_after_workouts(client, user):
     bench = by_name["Bench Press"]
     assert bench["times_performed"] == 2
     assert bench["last_performed_at"] == "2026-11-08T10:00:00Z"
-    assert bench["last_sets"] == [{"reps": 3, "weight": 110, "rpe": None, "kind": "working"}]
+    assert bench["last_sets"] == [{"reps": 3, "weight": 110, "rpe": None, "kind": "working", "duration_seconds": None, "distance_m": None}]
     assert by_name["Plank"]["times_performed"] == 0
 
 

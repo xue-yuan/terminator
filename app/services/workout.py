@@ -25,7 +25,15 @@ def _build_items(data: WorkoutIn, exercises: list[Exercise]) -> list[WorkoutItem
             superset=item.superset,
             order=i,
             sets=[
-                WorkoutSet(reps=s.reps, weight=s.weight, rpe=s.rpe, kind=s.kind, order=j)
+                WorkoutSet(
+                    reps=s.reps,
+                    weight=s.weight,
+                    rpe=s.rpe,
+                    kind=s.kind,
+                    duration_seconds=s.duration_seconds,
+                    distance_m=s.distance_m,
+                    order=j,
+                )
                 for j, s in enumerate(item.sets)
             ],
         )

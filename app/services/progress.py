@@ -250,11 +250,33 @@ class Replay:
                     self.unlocked[key] = Unlocked(at, workout_id)
 
 
+async def xp_totals(db: AsyncSession, user_ids: list[int]) -> dict[int, int]:
+    """Each user's banked XP: their workouts' plus their unlocked tiers' (as GET /progress
+    adds them up; what it hasn't banked yet shows once they next open the app)."""
+    totals = dict.fromkeys(user_ids, 0)
+    if not user_ids:
+        return totals
+    workout_xp = await db.execute(
+        select(XpAward.user_id, func.sum(XpAward.xp)).where(XpAward.user_id.in_(user_ids)).group_by(XpAward.user_id)
+    )
+    for user_id, xp in workout_xp:
+        totals[user_id] += int(xp)
+    tier_xp = {(a.id, t.target): t.xp for a in ACHIEVEMENTS for t in a.tiers}
+    unlocks = await db.execute(
+        select(AchievementUnlock.user_id, AchievementUnlock.achievement, AchievementUnlock.target).where(
+            AchievementUnlock.user_id.in_(user_ids)
+        )
+    )
+    for user_id, achievement, target in unlocks:
+        totals[user_id] += tier_xp.get((achievement, target), 0)
+    return totals
+
+
 class ProgressService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def _muscles(self, user_id: int) -> dict[UUID, tuple[str, str]]:
+    async def exercise_muscles(self, user_id: int) -> dict[UUID, tuple[str, str]]:
         """Each of the user's exercises: (lower-case name, muscle group), the library's when it has none."""
         library = {
             name.lower(): legacy_group(group, name, zh, aka) if group in LEGACY_GROUPS else group
@@ -274,7 +296,7 @@ class ProgressService:
         return out
 
     async def _history(self, user_id: int, tz: ZoneInfo) -> list[WorkoutFacts]:
-        muscles = await self._muscles(user_id)
+        muscles = await self.exercise_muscles(user_id)
         records = await pr_set_ids(self.db, user_id)
         rows = await self.db.execute(
             select(
@@ -289,6 +311,8 @@ class ProgressService:
                 WorkoutSet.kind,
                 WorkoutSet.weight,
                 WorkoutSet.reps,
+                WorkoutSet.duration_seconds,
+                WorkoutSet.distance_m,
             )
             .select_from(Workout)
             .outerjoin(WorkoutItem, WorkoutItem.workout_id == Workout.id)
@@ -298,7 +322,7 @@ class ProgressService:
         )
         workouts: dict[UUID, WorkoutFacts] = {}
         supersets: dict[UUID, dict[int, set[int]]] = defaultdict(lambda: defaultdict(set))
-        for wid, at, duration, item_id, exercise_id, unit, superset, set_id, kind, weight, reps in rows:
+        for wid, at, duration, item_id, exercise_id, unit, superset, set_id, kind, weight, reps, secs, dist in rows:
             w = workouts.get(wid)
             if w is None:
                 w = workouts[wid] = WorkoutFacts(wid, at.astimezone(tz), duration)
@@ -308,7 +332,8 @@ class ProgressService:
             w.exercises.add(exercise_id)
             if superset is not None:
                 supersets[wid][superset].add(item_id)
-            if set_id is None or kind != "working" or reps <= 0:
+            # A timed or cardio set logs a time or a distance instead of reps.
+            if set_id is None or kind != "working" or not (reps > 0 or (secs or 0) > 0 or (dist or 0) > 0):
                 continue
             kg = weight * KG_PER_LB if unit == "lb" else weight
             w.working_sets += 1

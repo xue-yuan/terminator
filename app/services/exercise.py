@@ -88,11 +88,28 @@ class ExerciseService:
         last = await self._last_items(user_id, ids)
         times = await self._times(user_id, ids)
         sets = await self._sets_by_item([row.item_id for row in last.values()])
-        best_weight = await self._best(user_id, ids, (_WEIGHT_KG.desc(), WorkoutSet.reps.desc()), WorkoutSet.weight > 0)
-        best_e1rm = await self._best(
-            user_id, ids, (_E1RM.desc(), WorkoutSet.reps.desc()), WorkoutSet.weight > 0, WorkoutSet.reps <= 12
+        reps = WorkoutSet.reps > 0
+        best_weight = await self._best(
+            user_id, ids, (_WEIGHT_KG.desc(), WorkoutSet.reps.desc()), reps, WorkoutSet.weight > 0
         )
-        best_reps = await self._best(user_id, ids, (WorkoutSet.reps.desc(), _WEIGHT_KG.desc()))
+        best_e1rm = await self._best(
+            user_id, ids, (_E1RM.desc(), WorkoutSet.reps.desc()), reps, WorkoutSet.weight > 0, WorkoutSet.reps <= 12
+        )
+        best_reps = await self._best(user_id, ids, (WorkoutSet.reps.desc(), _WEIGHT_KG.desc()), reps)
+        # Timed sets: the longest hold (a run's time is no record by itself: its distance is).
+        best_duration = await self._best(
+            user_id,
+            ids,
+            (WorkoutSet.duration_seconds.desc(),),
+            WorkoutSet.duration_seconds > 0,
+            WorkoutSet.distance_m.is_(None),
+        )
+        best_distance = await self._best(
+            user_id,
+            ids,
+            (WorkoutSet.distance_m.desc(), WorkoutSet.duration_seconds.asc().nulls_last()),
+            WorkoutSet.distance_m > 0,
+        )
         out = []
         for e in exercises:
             out_item = ExerciseOut.model_validate(e)
@@ -106,6 +123,8 @@ class ExerciseService:
                         "best_weight": best_weight.get(e.id),
                         "best_e1rm": best_e1rm.get(e.id),
                         "best_reps": best_reps.get(e.id),
+                        "best_duration": best_duration.get(e.id),
+                        "best_distance": best_distance.get(e.id),
                     }
                 )
             out.append(out_item)
@@ -156,6 +175,8 @@ class ExerciseService:
                 WorkoutItem.exercise_id,
                 WorkoutSet.weight,
                 WorkoutSet.reps,
+                WorkoutSet.duration_seconds,
+                WorkoutSet.distance_m,
                 WorkoutItem.weight_unit,
                 Workout.performed_at,
                 Workout.uuid,
@@ -166,7 +187,6 @@ class ExerciseService:
             .where(
                 Workout.user_id == user_id,
                 WorkoutItem.exercise_id.in_(ids),
-                WorkoutSet.reps > 0,
                 WorkoutSet.kind != "warmup",
                 *where,
             )
@@ -178,6 +198,8 @@ class ExerciseService:
                 weight=r.weight,
                 reps=r.reps,
                 weight_unit=r.weight_unit,
+                duration_seconds=r.duration_seconds,
+                distance_m=r.distance_m,
                 performed_at=r.performed_at,
                 workout_id=r.uuid,
             )
@@ -288,7 +310,7 @@ class ExerciseService:
             .values(exercise_id=target_id)
             .execution_options(synchronize_session=False)
         )
-        for key in ("muscle_group", "notes", "rep_min", "rep_max", "increment", "rest_seconds"):
+        for key in ("muscle_group", "log_type", "notes", "rep_min", "rep_max", "increment", "rest_seconds"):
             if getattr(target, key) is None:
                 setattr(target, key, getattr(source, key))
         target.updated_at = utcnow()

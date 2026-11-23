@@ -6,6 +6,8 @@ exercise (earlier workouts, and earlier sets of the same workout):
 - "weight": the heaviest weight (compared in kg)
 - "e1rm":   the highest estimated 1RM (Epley; sets of 1-12 reps)
 - "reps":   the most reps of a bodyweight set (weight 0)
+- "duration": the longest timed set without a distance (a plank)
+- "distance": the longest distance (a run)
 
 Nothing is a PR in the first workout an exercise is done in: there is nothing
 to beat yet (its sets only set the bar).
@@ -28,23 +30,26 @@ def _pr_query(exercise_filter: str, select: str) -> str:
     with the records it broke, as `flagged`; `select` picks from it."""
     return f"""
 WITH sets AS (
-    SELECT s.id, i.exercise_id, s.reps,
+    SELECT s.id, i.exercise_id, s.reps, s.duration_seconds AS secs, s.distance_m AS dist,
            s.weight * CASE WHEN i.weight_unit = 'lb' THEN {KG_PER_LB} ELSE 1.0 END AS kg,
            w.performed_at, w.id AS workout_id, i."order" AS item_order, s."order" AS set_order
     FROM workout_sets s
     JOIN workout_items i ON i.id = s.item_id
     JOIN workouts w ON w.id = i.workout_id
-    WHERE w.user_id = :user_id {exercise_filter} AND s.kind = 'working' AND s.reps > 0
+    WHERE w.user_id = :user_id {exercise_filter} AND s.kind = 'working'
+      AND (s.reps > 0 OR s.duration_seconds > 0 OR s.distance_m > 0)
 ), scored AS (
     SELECT *, CASE WHEN reps = 1 THEN kg ELSE kg * (1 + reps / 30.0) END AS e1rm FROM sets
 ), compared AS (
-    SELECT id, kg, reps, e1rm,
+    SELECT id, kg, reps, e1rm, secs, dist,
            workout_id <> first_value(workout_id) OVER (
                PARTITION BY exercise_id ORDER BY performed_at, workout_id
            ) AS done_before,
-           max(kg) FILTER (WHERE kg > 0) OVER earlier AS best_kg,
-           max(e1rm) FILTER (WHERE kg > 0 AND reps <= 12) OVER earlier AS best_e1rm,
-           max(reps) FILTER (WHERE kg = 0) OVER earlier AS best_reps
+           max(kg) FILTER (WHERE kg > 0 AND reps > 0) OVER earlier AS best_kg,
+           max(e1rm) FILTER (WHERE kg > 0 AND reps > 0 AND reps <= 12) OVER earlier AS best_e1rm,
+           max(reps) FILTER (WHERE kg = 0 AND reps > 0) OVER earlier AS best_reps,
+           max(secs) FILTER (WHERE secs > 0 AND dist IS NULL) OVER earlier AS best_secs,
+           max(dist) FILTER (WHERE dist > 0) OVER earlier AS best_dist
     FROM scored
     WINDOW earlier AS (
         PARTITION BY exercise_id ORDER BY performed_at, workout_id, item_order, set_order
@@ -52,9 +57,11 @@ WITH sets AS (
     )
 ), flagged AS (
     SELECT id,
-           coalesce(done_before AND kg > 0 AND kg > best_kg, false) AS weight,
-           coalesce(done_before AND kg > 0 AND reps <= 12 AND e1rm > best_e1rm, false) AS e1rm,
-           coalesce(done_before AND kg = 0 AND reps > best_reps, false) AS reps
+           coalesce(done_before AND reps > 0 AND kg > 0 AND kg > best_kg, false) AS weight,
+           coalesce(done_before AND reps > 0 AND kg > 0 AND reps <= 12 AND e1rm > best_e1rm, false) AS e1rm,
+           coalesce(done_before AND kg = 0 AND reps > best_reps, false) AS reps,
+           coalesce(done_before AND dist IS NULL AND secs > best_secs, false) AS duration,
+           coalesce(done_before AND dist > best_dist, false) AS distance
     FROM compared
 )
 {select}
@@ -64,7 +71,8 @@ WITH sets AS (
 _PR_FLAGS = text(
     _pr_query("AND i.exercise_id IN :exercise_ids", "SELECT * FROM flagged WHERE id IN :set_ids")
 ).bindparams(bindparam("exercise_ids", expanding=True), bindparam("set_ids", expanding=True))
-_PR_SETS = text(_pr_query("", "SELECT id FROM flagged WHERE weight OR e1rm OR reps"))
+_PR_SETS = text(_pr_query("", "SELECT id FROM flagged WHERE weight OR e1rm OR reps OR duration OR distance"))
+PR_KINDS = ("weight", "e1rm", "reps", "duration", "distance")
 
 
 async def pr_set_ids(db: AsyncSession, user_id: int) -> set[int]:
@@ -88,4 +96,4 @@ async def mark_prs(db: AsyncSession, user_id: int, workouts: Iterable[Workout]) 
     )
     by_id = {s.id: s for s in sets}
     for row in rows:
-        by_id[row.id].pr = [kind for kind in ("weight", "e1rm", "reps") if getattr(row, kind)]
+        by_id[row.id].pr = [kind for kind in PR_KINDS if getattr(row, kind)]
