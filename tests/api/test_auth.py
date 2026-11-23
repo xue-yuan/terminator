@@ -159,3 +159,42 @@ async def test_with_admins_set_only_admins_and_people_they_let_in_can_sign_in(cl
 async def test_without_admins_anyone_can_sign_in(client, user):
     me = (await client.get("/api/v1/users/me", headers=user["headers"])).json()
     assert me["is_admin"] is False
+
+
+async def test_rename_is_what_others_see(client, make_user):
+    sarah = await make_user()
+    kyle = await make_user(email="kyle@example.com", name="Kyle Reese")
+    before = (await client.get("/api/v1/sync/state", headers=kyle["headers"])).json()
+
+    r = await client.patch("/api/v1/users/me", json={"full_name": "  The \n Terminator  "}, headers=sarah["headers"])
+    assert r.status_code == 200, r.text
+    assert r.json()["full_name"] == "The Terminator"  # spaces tidied
+    assert r.json()["email"] == "sarah@example.com"
+
+    me = await client.get("/api/v1/users/me", headers=sarah["headers"])
+    assert me.json()["full_name"] == "The Terminator"
+    players = (await client.get("/api/v1/community", headers=kyle["headers"])).json()
+    assert "The Terminator" in [p["name"] for p in players]
+    # Other devices and other people's community lists notice.
+    after = (await client.get("/api/v1/sync/state", headers=kyle["headers"])).json()
+    assert after["community"] != before["community"]
+
+
+@pytest.mark.parametrize("name", ["", "   ", "x" * 41], ids=["empty", "blank", "too-long"])
+async def test_rename_rejects_empty_or_long_names(client, user, name):
+    r = await client.patch("/api/v1/users/me", json={"full_name": name}, headers=user["headers"])
+    assert r.status_code == 422
+    assert isinstance(r.json()["detail"], str)  # a sentence, shown as is
+    me = await client.get("/api/v1/users/me", headers=user["headers"])
+    assert me.json()["full_name"] == "Sarah Connor"
+
+
+async def test_rename_survives_signing_in_with_google_again(client, monkeypatch):
+    _google(monkeypatch)
+    tokens = (await client.post("/api/v1/auth/google", json={"id_token": "x"})).json()
+    h = {"Authorization": f"Bearer {tokens['access_token']}"}
+    assert (await client.patch("/api/v1/users/me", json={"full_name": "Kyle"}, headers=h)).status_code == 200
+
+    again = (await client.post("/api/v1/auth/google", json={"id_token": "x"})).json()
+    me = await client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {again['access_token']}"})
+    assert me.json()["full_name"] == "Kyle"

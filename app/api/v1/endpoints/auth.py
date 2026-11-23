@@ -2,12 +2,12 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.api.deps import AuthSvc, CurrentUser, SummarySvc, unauthorized
+from app.api.deps import DB, AuthSvc, CurrentUser, SummarySvc, unauthorized
 from app.core import security
 from app.core.config import settings
 from app.models.user import User
 from app.schemas.token import AuthConfig, GoogleLoginRequest, RefreshRequest, Token
-from app.schemas.user import Summary, UserOut
+from app.schemas.user import NAME_MAX, Summary, UserOut, UserUpdate
 from app.services.access import AccessService
 from app.services.auth import DEV_USER_EMAIL, GoogleAuthError, GoogleUnavailable
 
@@ -78,9 +78,26 @@ async def refresh(payload: RefreshRequest, auth: AuthSvc) -> Token:
     return _issue_tokens(user)
 
 
+def _me(user: User) -> UserOut:
+    return UserOut.model_validate(user).model_copy(update={"is_admin": settings.is_admin(user.email)})
+
+
 @router.get("/users/me", response_model=UserOut)
 async def read_me(user: CurrentUser) -> UserOut:
-    return UserOut.model_validate(user).model_copy(update={"is_admin": settings.is_admin(user.email)})
+    return _me(user)
+
+
+@router.patch("/users/me", response_model=UserOut)
+async def update_me(payload: UserUpdate, user: CurrentUser, db: DB) -> UserOut:
+    """Change your name. Signing in with Google again doesn't change it back."""
+    name = " ".join(payload.full_name.split())  # no line breaks or runs of spaces
+    if not name:
+        raise HTTPException(status_code=422, detail="Enter a name")
+    if len(name) > NAME_MAX:
+        raise HTTPException(status_code=422, detail=f"Keep the name to {NAME_MAX} characters")
+    user.full_name = name
+    await db.commit()
+    return _me(user)
 
 
 @router.get("/users/me/summary", response_model=Summary)
