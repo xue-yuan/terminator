@@ -84,8 +84,10 @@ class CommunityService:
             streak=streak,
         )
 
-    async def feed(self, me: User, before: datetime | None = None, limit: int = 30) -> list[FeedItem]:
-        """Members' finished workouts, latest first: who and when."""
+    async def feed(
+        self, me: User, before: datetime | None = None, limit: int = 30, since: datetime | None = None
+    ) -> list[FeedItem]:
+        """Members' finished workouts, latest first: who and when (only those finished at `since` or later, if given)."""
         people = {u.id: u for u in await access_members(self.db)}
         finished = Workout.performed_at + func.make_interval(0, 0, 0, 0, 0, 0, func.coalesce(Workout.duration_seconds, 0))
         stmt = (
@@ -96,6 +98,8 @@ class CommunityService:
         )
         if before is not None:
             stmt = stmt.where(finished < before)
+        if since is not None:
+            stmt = stmt.where(finished >= since)
         rows = (await self.db.execute(stmt)).all()
         fives = (
             await self.db.execute(

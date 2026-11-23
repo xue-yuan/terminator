@@ -27,10 +27,11 @@ async def read_feed(
     user: CurrentUser,
     service: CommunitySvc,
     before: AwareDatetime | None = Query(None, description="Older than this (the last item's `at`), for the next page"),
+    since: AwareDatetime | None = Query(None, description="Finished at this time or later (the app asks from its own midnight)"),
     limit: int = Query(30, ge=1, le=100),
 ) -> list[FeedItem]:
     """Who finished a workout, and when, latest first. Nothing else about it is shared."""
-    return await service.feed(user, before, limit)
+    return await service.feed(user, before, limit, since)
 
 
 async def _high_five(user, service, workout_id: UUID, on: bool) -> None:

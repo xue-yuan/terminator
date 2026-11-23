@@ -159,6 +159,14 @@ async def test_feed_says_who_and_when_and_takes_high_fives(client, pair):
     page = (await client.get("/api/v1/community/feed", params={"before": "2026-11-20T10:00:00Z"}, headers=sarah["headers"])).json()
     assert [f["name"] for f in page] == ["Kyle Reese"]
 
+    # Only today's (the app asks from its own midnight): by when it finished, not when it started.
+    await train(client, kyle["headers"], "2026-11-20T15:30:00Z", duration=3600)  # 23:30 to 00:30 in Taipei
+    midnight = "2026-11-21T00:00:00+08:00"
+    today = (await client.get("/api/v1/community/feed", params={"since": midnight}, headers=sarah["headers"])).json()
+    assert [(f["name"], f["at"]) for f in today] == [("Kyle Reese", "2026-11-20T16:30:00Z")]
+    naive = await client.get("/api/v1/community/feed", params={"since": "2026-11-21T00:00:00"}, headers=sarah["headers"])
+    assert naive.status_code == 422
+
 
 async def test_sync_state_follows_the_community(client, pair):
     sarah, kyle = pair
