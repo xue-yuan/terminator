@@ -35,6 +35,7 @@ async def test_fingerprints_move_only_with_their_data(client, user, make_user):
         "catalog",
         "summary",
         "progress",
+        "community",
         "spotify",
         "user",
     }
@@ -44,7 +45,8 @@ async def test_fingerprints_move_only_with_their_data(client, user, make_user):
     wid = uuid.uuid4()
     assert (await client.put(f"/api/v1/workouts/{wid}", json=workout(), headers=user["headers"])).status_code == 201
     s1 = await _state(client, user)
-    assert changed(s0, s1) == {"workouts", "exercises", "activity", "plans", "summary", "progress"}
+    # (The community feed shows it too.)
+    assert changed(s0, s1) == {"workouts", "exercises", "activity", "plans", "summary", "progress", "community"}
 
     # Editing it again moves them again (same row count, later update).
     await client.put(f"/api/v1/workouts/{wid}", json=workout(notes="felt heavy"), headers=user["headers"])
@@ -79,11 +81,12 @@ async def test_fingerprints_move_only_with_their_data(client, user, make_user):
     await client.delete(f"/api/v1/workouts/{wid}", headers=user["headers"])
     assert {"workouts", "activity"} <= changed(s7, await _state(client, user))
 
-    # Someone else's changes don't touch yours.
+    # Someone else's workout touches nothing of yours but the community (its feed and
+    # goals) and your progress (community titles come from everyone's workouts).
     other = await make_user(email="t1000@example.com")
     before = await _state(client, user)
     await client.put(f"/api/v1/workouts/{uuid.uuid4()}", json=workout(), headers=other["headers"])
-    assert before == await _state(client, user)
+    assert changed(before, await _state(client, user)) == {"community", "progress"}
 
 
 async def test_needs_sign_in(client):

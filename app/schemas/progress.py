@@ -22,7 +22,8 @@ class AchievementOut(BaseModel):
     icon: str
     metric: str  # what value counts (sets, kg, a ratio...), for showing it
     hidden: bool
-    value: float  # where you are now (0 while hidden)
+    value: float  # where you are now (0 while hidden); for a community total, everyone's
+    own: float | None = None  # a community total: your part of it
     tiers: list[TierOut]
 
 
@@ -47,6 +48,7 @@ class ProgressOut(BaseModel):
     level_xp: int  # total XP this level started at
     next_level_xp: int  # total XP the next level starts at
     title: TitleOut | None
+    community_title: TitleOut | None = None  # worn next to the name, apart from `title`
     # How XP is earned (app/services/achievements.py), so a device can work out
     # a finished workout's XP before it's uploaded.
     rules: dict[str, int]

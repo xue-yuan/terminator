@@ -9,12 +9,14 @@ them never loads the data itself.
 
 import hashlib
 
-from sqlalchemy import func, select
+from sqlalchemy import func, literal_column, select
+from sqlalchemy.dialects.postgresql import aggregate_order_by
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.body_weight import BodyWeight
 from app.models.exercise import Exercise
+from app.models.high_five import HighFive
 from app.models.plan import Plan, PlanDay, PlanExercise
 from app.models.progress import AchievementUnlock
 from app.models.spotify import SpotifyLink
@@ -76,6 +78,22 @@ class SyncService:
                 AchievementUnlock.user_id == user.id, AchievementUnlock.achievement.in_(achievements.GRANTED)
             )
         )
+        # The community: everyone's workouts (the feed, the shared goals), high-fives, who's in and their titles.
+        everyone = tuple((await self.db.execute(select(func.count(), func.max(Workout.updated_at)))).one())
+        fives = tuple((await self.db.execute(select(func.count(), func.max(HighFive.created_at)))).one())
+        people = tuple(
+            (
+                await self.db.execute(
+                    select(
+                        func.count(),
+                        func.string_agg(
+                            func.concat(User.id, ":", User.title, ":", User.community_title, ":", User.full_name),
+                            aggregate_order_by(literal_column("','"), User.id),
+                        ),
+                    )
+                )
+            ).one()
+        )
         spotify = (
             await self.db.execute(select(SpotifyLink.updated_at).where(SpotifyLink.user_id == user.id))
         ).scalar_one_or_none()
@@ -92,9 +110,19 @@ class SyncService:
             "summary": _digest(workouts, plans, user.active_plan_id),
             # XP, levels and achievements come from workouts, weigh-ins and the muscle
             # groups of exercises (yours and the library's), the rules themselves, and titles given by hand.
+            # ...and community titles from everyone's workouts.
             "progress": _digest(
-                workouts, exercises, body_weights, catalog, user.title, achievements.VERSION, granted
+                workouts,
+                exercises,
+                body_weights,
+                catalog,
+                user.title,
+                user.community_title,
+                achievements.VERSION,
+                granted,
+                everyone,
             ),
+            "community": _digest(everyone, fives, people),
             "spotify": _digest(bool(settings.SPOTIFY_CLIENT_ID), spotify),
             "user": _digest(user.email, user.full_name, user.active_plan_id, settings.is_admin(user.email)),
         }

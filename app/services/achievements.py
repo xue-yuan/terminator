@@ -32,7 +32,12 @@ CATEGORIES = [
     ("habits", "Habits"),
     ("muscles", "Muscles"),
     ("special", "Special"),
+    ("community", "Community"),
 ]
+
+# Community titles (category "community"): earned together, by reaching the
+# community's goals (app/services/team.py), and worn in a slot of their own.
+COMMUNITY = "community"
 
 # Body parts and their muscle groups (the frontend's REGIONS in lib/exercises.js).
 REGIONS = {
@@ -236,9 +241,56 @@ ACHIEVEMENTS: list[Achievement] = [
     _a("creator", "special", "Made This App", "crown", "granted", [
         (1, "special", 0, "The Creator", "造物主", "Built the app everyone here trains with."),
     ]),
+    # ---- community: the weekly goal everyone shares, and running totals everyone adds to ----
+    _a("team_weeks", "community", "Goals Reached", "shield", "team_weeks", [
+        (1, "bronze", 100, "Team Player", "團隊一份子", "Train in a week the community reaches its goal."),
+        (4, "bronze", 200, "Best Teammate", "最佳隊友", "Train in 4 weeks the community reaches its goal."),
+        (12, "silver", 300, "Squad Soul", "團魂", "Train in 12 weeks the community reaches its goal."),
+        (26, "gold", 500, "Iron Squad", "鐵血戰隊", "Train in 26 weeks the community reaches its goal."),
+        (52, "platinum", 1000, "Legendary Squad", "傳奇戰隊", "Train in 52 weeks the community reaches its goal."),
+    ]),
+    _a("team_streak", "community", "Goal Streak", "link-2", "team_streak", [
+        (3, "bronze", 150, "In Sync", "默契十足", "Reach the community goal 3 weeks in a row, training every one of them."),
+        (8, "silver", 300, "Brothers in Arms", "生死之交", "Reach the community goal 8 weeks in a row, training every one of them."),
+        (16, "gold", 600, "Stronger Together", "團結就是力量", "Reach the community goal 16 weeks in a row, training every one of them."),
+    ]),
+    _a("full_house", "community", "Full House", "party-popper", "full_house_weeks", [
+        (1, "bronze", 150, "Full House", "全員到齊", "Everyone who trained in the last 4 weeks trains this week too."),
+        (10, "silver", 400, "No One Left Behind", "一個都不能少", "Have a full house 10 weeks."),
+    ]),
+    _a("team_bench", "community", "Bench Together", "dumbbell", "team_sets", [
+        (500, "bronze", 150, "Bench Club", "臥推同好會", "Bench 500 working sets together (25 of them yours)."),
+        (2000, "silver", 300, "Bench Battalion", "臥推大隊", "Bench 2,000 working sets together (100 of them yours)."),
+        (10000, "gold", 600, "Bench Terminators", "臥推終結者聯盟", "Bench 10,000 working sets together (500 of them yours)."),
+    ], {"exercises": ["Bench Press"], "share": 0.05}),
+    _a("team_squat", "community", "Squat Together", "weight", "team_sets", [
+        (500, "bronze", 150, "Squat Club", "深蹲同好會", "Squat 500 working sets together (25 of them yours)."),
+        (2000, "silver", 300, "Squat Battalion", "深蹲大隊", "Squat 2,000 working sets together (100 of them yours)."),
+        (10000, "gold", 600, "Squat Terminators", "深蹲終結者聯盟", "Squat 10,000 working sets together (500 of them yours)."),
+    ], {"exercises": ["Squat"], "share": 0.05}),
+    _a("team_deadlift", "community", "Deadlift Together", "anchor", "team_sets", [
+        (300, "bronze", 150, "Deadlift Club", "硬舉同好會", "Deadlift 300 working sets together (15 of them yours)."),
+        (1000, "silver", 300, "Deadlift Battalion", "硬舉大隊", "Deadlift 1,000 working sets together (50 of them yours)."),
+        (5000, "gold", 600, "Deadlift Terminators", "硬舉終結者聯盟", "Deadlift 5,000 working sets together (250 of them yours)."),
+    ], {"exercises": ["Deadlift"], "share": 0.05}),
+    _a("team_workouts", "community", "Train Together", "calendar-check", "team_workouts", [
+        (100, "bronze", 150, "Hundred Together", "百場同行", "Log 100 workouts together (5 of them yours)."),
+        (500, "silver", 300, "The Five Hundred", "五百壯士", "Log 500 workouts together (25 of them yours)."),
+        (2000, "gold", 600, "Army of Two Thousand", "兩千大軍", "Log 2,000 workouts together (100 of them yours)."),
+    ], {"share": 0.05}),
+    _a("team_volume", "community", "Lift Together", "mountain", "team_volume_kg", [
+        (100_000, "bronze", 150, "Moving Company", "搬家公司", "Lift 100 t together (5 t of it yours)."),
+        (1_000_000, "silver", 300, "Human Cranes", "人體起重機", "Lift 1,000 t together (50 t of it yours)."),
+        (10_000_000, "gold", 600, "Tonnage Harvesters", "噸位收割機", "Lift 10,000 t together (500 t of it yours)."),
+    ], {"share": 0.05}),
+    _a("team_distance", "community", "Run Together", "footprints", "team_distance_m", [
+        (100_000, "bronze", 150, "Running Buddies", "跑步夥伴", "Cover 100 km of cardio together (5 km of it yours)."),
+        (1_000_000, "silver", 400, "Round-the-Island Crew", "環島車隊", "Cover 1,000 km of cardio together (50 km of it yours)."),
+    ], {"share": 0.05}),
 ]
 
 BY_ID = {a.id: a for a in ACHIEVEMENTS}
+TEAM_METRICS = ("team_weeks", "team_streak", "full_house_weeks", "team_sets", "team_workouts", "team_volume_kg", "team_distance_m")
 GRANTED = tuple(a.id for a in ACHIEVEMENTS if a.metric == "granted")
 
 # Moves whenever a definition does, so clients refetch (GET /sync/state).

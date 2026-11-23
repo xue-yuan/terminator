@@ -33,8 +33,10 @@ from app.services.achievements import (
     ACHIEVEMENTS,
     BY_ID,
     CATEGORIES,
+    COMMUNITY,
     REGIONS,
     RULES,
+    TEAM_METRICS,
     Achievement,
     find_tier,
     level_for,
@@ -44,6 +46,7 @@ from app.services.achievements import (
 from app.services.errors import NotFound
 from app.services.exercise import KG_PER_LB
 from app.services.records import pr_set_ids
+from app.services.team import TeamService
 
 REGION_OF = {muscle: region for region, muscles in REGIONS.items() for muscle in muscles}
 UPPER = ("chest", "arms")  # what "chicken legs" weighs against legs
@@ -239,6 +242,8 @@ class Replay:
                     v[a.id] = 1
             case "level" | "body_weight_entries" | "granted":
                 pass  # levels come from the XP total, weigh-ins from add_weigh_in, granted titles by hand
+            case metric if metric in TEAM_METRICS:
+                pass  # community titles come from everyone's workouts (app/services/team.py)
             case _:
                 raise ValueError(f"unknown metric {a.metric}")
 
@@ -395,6 +400,14 @@ class ProgressService:
         that gives it a card of its own would never show it."""
         replay = await self._replay(user, tz)
         await self._bank(user.id, replay)
+        # Community titles: from everyone's workouts, banked the same way.
+        team = await TeamService(self.db).standing(user.id)
+        await self._unlock(
+            [
+                {"user_id": user.id, "achievement": a, "target": t, "unlocked_at": at, "workout_id": None}
+                for (a, t), at in team.unlocked.items()
+            ]
+        )
 
         stored = await self._stored(user.id)
         workout_xp = await self.db.scalar(
@@ -419,7 +432,12 @@ class ProgressService:
         for a in ACHIEVEMENTS:
             if a.metric == "granted" and not (granted and any((a.id, t.target) in stored for t in a.tiers)):
                 continue  # someone else's (not even a secret to you), or an app that can't show it
-            value = level if a.metric == "level" else replay.values[a.id]
+            if a.metric == "level":
+                value = level
+            elif a.category == COMMUNITY:
+                value = team.values.get(a.id, 0)
+            else:
+                value = replay.values[a.id]
             tiers = [
                 TierOut(
                     target=t.target,
@@ -444,6 +462,7 @@ class ProgressService:
                     metric=a.metric,
                     hidden=a.hidden,
                     value=0 if secret else round(value, 2),
+                    own=round(team.own[a.id], 2) if a.id in team.own else None,
                     tiers=tiers,
                 )
             )
@@ -452,29 +471,32 @@ class ProgressService:
             level=level,
             level_xp=xp_for_level(level),
             next_level_xp=xp_for_level(level + 1),
-            title=self._title(user, stored),
+            title=self._title(user.title, stored),
+            community_title=self._title(user.community_title, stored),
             rules=RULES,
             categories=[{"id": c, "name": n} for c, n in CATEGORIES],
             achievements=achievements,
         )
 
     @staticmethod
-    def _title(user: User, stored) -> TitleOut | None:
-        found = find_tier(user.title) if user.title else None
+    def _title(key: str | None, stored) -> TitleOut | None:
+        found = find_tier(key) if key else None
         if not found or (found[0].id, found[1].target) not in stored:
             return None
         return TitleOut(key=title_key(*found), title=found[1].title, medal=found[1].medal)
 
-    async def set_title(self, user: User, key: str | None) -> TitleOut | None:
-        """Wear an unlocked tier's title (None: none)."""
+    async def set_title(self, user: User, key: str | None, *, community: bool = False) -> TitleOut | None:
+        """Wear an unlocked tier's title (None: none): a regular one, or with
+        `community` a community title (each slot takes only its own kind)."""
+        slot = "community_title" if community else "title"
         if key is None:
-            user.title = None
+            setattr(user, slot, None)
             await self.db.commit()
             return None
         found = find_tier(key)
         stored = await self._stored(user.id)
-        if not found or (found[0].id, found[1].target) not in stored:
+        if not found or (found[0].id, found[1].target) not in stored or (found[0].category == COMMUNITY) != community:
             raise NotFound("No such title unlocked")
-        user.title = title_key(*found)
+        setattr(user, slot, title_key(*found))
         await self.db.commit()
-        return TitleOut(key=user.title, title=found[1].title, medal=found[1].medal)
+        return TitleOut(key=title_key(*found), title=found[1].title, medal=found[1].medal)

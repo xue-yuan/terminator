@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     # Spotify playback controls while logging (a Spotify app's client id; the
     # browser signs in with PKCE, so no secret). Empty: the feature is hidden.
     SPOTIFY_CLIENT_ID: str = ""
+    # The community's weeks (its shared weekly goal) run Monday to Sunday in this time zone.
+    COMMUNITY_TZ: str = "Asia/Taipei"
     SPOTIFY_ACCOUNTS_URL: str = "https://accounts.spotify.com"  # overridden in tests
 
     # Passwordless "log in as the dev user" button. Defaults to on only for local.

@@ -20,6 +20,16 @@ def normalize(email: str) -> str:
     return email.strip().lower()
 
 
+async def members(db: AsyncSession) -> list[User]:
+    """Everyone who may use the app (the community): active accounts, and when
+    access is restricted, only admins and people let in."""
+    users = (await db.execute(select(User).where(User.is_active).order_by(User.id))).scalars().all()
+    if not settings.access_restricted:
+        return list(users)
+    allowed = set((await db.execute(select(AllowedEmail.email))).scalars())
+    return [u for u in users if settings.is_admin(u.email) or normalize(u.email) in allowed]
+
+
 class AccessService:
     def __init__(self, db: AsyncSession):
         self.db = db

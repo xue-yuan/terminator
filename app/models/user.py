@@ -18,3 +18,5 @@ class User(Base):
     )
     # The title shown under the name: an unlocked achievement tier, "<achievement>:<target>".
     title: Mapped[str | None] = mapped_column(String(60))
+    # The community title worn next to the name (a tier of a "community" achievement), apart from `title`.
+    community_title: Mapped[str | None] = mapped_column(String(60))

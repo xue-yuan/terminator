@@ -32,3 +32,12 @@ async def put_title(data: TitleIn, user: CurrentUser, service: ProgressSvc) -> T
         return await service.set_title(user, data.title)
     except NotFound:
         raise HTTPException(status_code=404, detail="That title isn't unlocked") from None
+
+
+@router.put("/community-title", response_model=TitleOut | None)
+async def put_community_title(data: TitleIn, user: CurrentUser, service: ProgressSvc) -> TitleOut | None:
+    """Wear an unlocked community title next to your name, or none (null)."""
+    try:
+        return await service.set_title(user, data.title, community=True)
+    except NotFound:
+        raise HTTPException(status_code=404, detail="That community title isn't unlocked") from None
