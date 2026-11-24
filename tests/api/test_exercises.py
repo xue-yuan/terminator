@@ -78,7 +78,8 @@ async def test_new_exercise_keeps_the_client_id_and_unknown_ids_fall_back_to_the
 async def test_list_reports_last_sets_and_records_compared_in_kg(client, user):
     await put(client, user, workout("2026-11-01T08:00:00Z", item("Bench Press", (100, 8), (60, 15))))
     await put(client, user, workout("2026-11-08T08:00:00Z", item("Bench Press", (225, 5), unit="lb")))
-    await put(client, user, workout("2026-11-09T08:00:00Z", item("Dips", (0, 12), (0, 15))))
+    # Dips with more reps weighted than bodyweight: the reps record is the bodyweight one.
+    await put(client, user, workout("2026-11-09T08:00:00Z", item("Dips", (0, 12), (0, 15), (20, 20))))
     ex = await exercises(client, user)
     bench = ex["Bench Press"]
     assert (bench["last_unit"], bench["last_sets"]) == ("lb", [{"weight": 225, "reps": 5, "rpe": None, "kind": "working", "duration_seconds": None, "distance_m": None}])
@@ -86,10 +87,11 @@ async def test_list_reports_last_sets_and_records_compared_in_kg(client, user):
     assert (bench["best_weight"]["weight"], bench["best_weight"]["weight_unit"]) == (225, "lb")
     # 100 kg x 8 (est. 126.7 kg) beats 225 lb x 5 (est. 119.1 kg); 60 x 15 is past the 12-rep cutoff
     assert (bench["best_e1rm"]["weight"], bench["best_e1rm"]["reps"]) == (100, 8)
-    assert bench["best_reps"]["reps"] == 15
+    assert bench["best_reps"] is None  # most reps is a bodyweight record
     dips = ex["Dips"]
-    assert dips["best_weight"] is None and dips["best_e1rm"] is None
-    assert dips["best_reps"]["reps"] == 15
+    assert (dips["best_weight"]["weight"], dips["best_weight"]["reps"]) == (20, 20)
+    assert dips["best_e1rm"] is None  # 20 reps is past the cutoff
+    assert (dips["best_reps"]["weight"], dips["best_reps"]["reps"]) == (0, 15)
 
 
 async def test_warmup_sets_round_trip_and_never_count_as_records(client, user):
@@ -105,7 +107,7 @@ async def test_warmup_sets_round_trip_and_never_count_as_records(client, user):
     assert [s["kind"] for s in body["items"][0]["sets"]] == ["warmup", "working", "working"]
     squat = (await exercises(client, user))["Squat"]
     assert (squat["best_weight"]["weight"], squat["best_weight"]["reps"]) == (100, 5)
-    assert squat["best_reps"]["reps"] == 5
+    assert squat["best_reps"] is None  # no bodyweight sets
     assert [s["kind"] for s in squat["last_sets"]] == ["warmup", "working", "working"]  # hints need both
 
     r = await client.put(

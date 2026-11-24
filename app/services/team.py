@@ -15,6 +15,7 @@ import math
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
+from fractions import Fraction
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -29,8 +30,16 @@ from app.services.achievements import ACHIEVEMENTS, COMMUNITY
 from app.services.exercise import _WEIGHT_KG
 
 MIN_TARGET = 3
-TARGET_SHARE = 0.9
+TARGET_SHARE = Fraction(9, 10)  # exact, so a half is a half (no 4.4999… from floats)
 LOOKBACK_WEEKS = 4
+
+
+def weekly_target(totals: list[int]) -> int:
+    """The goal after weeks with these totals: 90% of their average, rounded half up
+    (四捨五入: 4.5 is 5, where Python's round() would give 4), at least MIN_TARGET."""
+    if not totals:
+        return MIN_TARGET
+    return max(MIN_TARGET, math.floor(TARGET_SHARE * sum(totals) / len(totals) + Fraction(1, 2)))
 
 
 @dataclass
@@ -124,8 +133,7 @@ class TeamService:
         last = max(_monday(today), max(by_week))
         while week <= last:
             these = sorted(by_week.get(week, []), key=lambda d: d.at)
-            before = [w.total for w in weeks[-LOOKBACK_WEEKS:]]
-            target = max(MIN_TARGET, round(TARGET_SHARE * sum(before) / len(before))) if before else MIN_TARGET
+            target = weekly_target([w.total for w in weeks[-LOOKBACK_WEEKS:]])
             first: dict[int, datetime] = {}
             for d in these:
                 first.setdefault(d.user_id, d.at)

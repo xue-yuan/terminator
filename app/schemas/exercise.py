@@ -138,7 +138,7 @@ class ExerciseOut(BaseModel):
     # Records over all logged working sets (not warm-ups); weights are compared in kg.
     best_weight: SetRecord | None = None  # heaviest set
     best_e1rm: SetRecord | None = None  # highest estimated 1RM (sets of 1-12 reps)
-    best_reps: SetRecord | None = None  # most reps in one set
+    best_reps: SetRecord | None = None  # most reps in one bodyweight set (weight 0)
     best_duration: SetRecord | None = None  # longest set without a distance (a plank)
     best_distance: SetRecord | None = None  # longest distance in one set (a run)
 

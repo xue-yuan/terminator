@@ -60,8 +60,12 @@ class WorkoutService:
         return workouts
 
     async def activity(self, user_id: int) -> list[WorkoutActivity]:
-        """Every workout's date, name, length and working-set count, most recent first."""
-        working_sets = func.count(WorkoutSet.id).filter(WorkoutSet.kind == "working")
+        """Every workout's date, name, length and working-set count, most recent first.
+        A set counts as XP and the recap count it: reps, or a time or a distance."""
+        working_sets = func.count(WorkoutSet.id).filter(
+            WorkoutSet.kind == "working",
+            (WorkoutSet.reps > 0) | (WorkoutSet.duration_seconds > 0) | (WorkoutSet.distance_m > 0),
+        )
         stmt = (
             select(Workout.uuid, Workout.performed_at, Workout.name, Workout.duration_seconds, working_sets)
             .outerjoin(WorkoutItem, WorkoutItem.workout_id == Workout.id)

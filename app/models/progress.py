@@ -33,5 +33,6 @@ class AchievementUnlock(Base):
     achievement: Mapped[str] = mapped_column(String(40), primary_key=True)
     target: Mapped[float] = mapped_column(Float, primary_key=True)
     unlocked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    # The workout that reached it, when one did (not for weigh-ins or levels).
+    # The workout that reached it, when one did (not for weigh-ins; for a level, the
+    # workout whose XP took the total there, unless a title's XP did).
     workout_id: Mapped[UUID | None] = mapped_column(Uuid)

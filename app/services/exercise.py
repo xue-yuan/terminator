@@ -95,7 +95,9 @@ class ExerciseService:
         best_e1rm = await self._best(
             user_id, ids, (_E1RM.desc(), WorkoutSet.reps.desc()), reps, WorkoutSet.weight > 0, WorkoutSet.reps <= 12
         )
-        best_reps = await self._best(user_id, ids, (WorkoutSet.reps.desc(), _WEIGHT_KG.desc()), reps)
+        # The "most reps" record is of bodyweight sets only (app/services/records.py): a
+        # weighted set with more reps must not hide it from the app's PR check.
+        best_reps = await self._best(user_id, ids, (WorkoutSet.reps.desc(),), reps, WorkoutSet.weight == 0)
         # Timed sets: the longest hold (a run's time is no record by itself: its distance is).
         best_duration = await self._best(
             user_id,

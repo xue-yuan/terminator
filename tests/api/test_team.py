@@ -108,6 +108,36 @@ async def test_community_titles_have_a_slot_of_their_own(client, pair):
     assert r.json() is None
 
 
+@pytest.mark.parametrize(
+    ("totals", "target"),
+    [
+        ([], 3),  # nothing before: the minimum
+        ([5, 5, 5, 5], 5),  # 4.5 rounds half up (Python's round() gives 4)
+        ([10, 0], 5),  # average 5 again, over two weeks
+        ([15, 15, 15, 15], 14),  # 13.5
+        ([25, 25, 25, 25], 23),  # 22.5 (round() gives 22)
+        ([4, 4, 4, 4], 4),  # 3.6
+        ([2, 2, 2, 2], 3),  # 1.8, under the minimum
+    ],
+)
+def test_the_weekly_goal_is_90_percent_rounded_half_up(totals, target):
+    from app.services.team import weekly_target
+
+    assert weekly_target(totals) == target
+
+
+async def test_a_goal_on_a_half_rounds_up(client, pair):
+    sarah, kyle = pair
+    # Week of 2 Nov: 5 workouts. The week of 9 Nov's goal is 90% of 5 = 4.5, so 5 (not 4).
+    for h, day in ((sarah, 2), (sarah, 3), (sarah, 4), (kyle, 5), (kyle, 6)):
+        await train(client, h["headers"], f"2026-11-{day:02d}T10:00:00Z")
+    # 4 the week after: one short.
+    for h, day in ((sarah, 9), (sarah, 10), (kyle, 11), (kyle, 12)):
+        await train(client, h["headers"], f"2026-11-{day:02d}T10:00:00Z")
+    p = await progress(client, sarah["headers"])
+    assert community(p, "team_weeks")["value"] == 1  # only the week of 2 Nov
+
+
 async def test_this_weeks_goal(client, pair):
     sarah, kyle = pair
     now = datetime.now(UTC)

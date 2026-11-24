@@ -123,13 +123,53 @@ async def test_records_and_streak_bonus(client, user):
 
 
 async def test_levels_unlock_their_titles(client, user):
+    from sqlalchemy import update
+
+    from app.models.progress import AchievementUnlock
+    from tests.conftest import TestSession
+
     h = user["headers"]
+    ids = []
     for day in (2, 3, 4):  # 3 × 350 XP + First Rep (light, so no volume titles)
-        await workout(client, h, f"2026-11-{day:02d}T18:00:00Z", [{"exercise_name": "Leg Press", "sets": sets(30, 10, 5)}])
+        ids.append(
+            await workout(client, h, f"2026-11-{day:02d}T18:00:00Z", [{"exercise_name": "Leg Press", "sets": sets(30, 10, 5)}])
+        )
     p = await progress(client, h)
     assert p["level"] == 5 and p["xp"] >= xp_for_level(5)
     assert unlocked(p, "level") == [5]
     assert achievement(p, "level")["value"] == 5
+    # Dated by the workout that got there (450 → 800 → 1150 XP; level 5 is 1000), not by
+    # when the app asked, so a recap puts it in the right week.
+    tier = achievement(p, "level")["tiers"][0]
+    assert tier["unlocked_at"].startswith("2026-11-04T18:00") and tier["workout_id"] == ids[2]
+
+    # A level dated when it was first seen (as builds before this one did) moves back.
+    async with TestSession() as s:
+        await s.execute(
+            update(AchievementUnlock)
+            .where(AchievementUnlock.user_id == user["id"], AchievementUnlock.achievement == "level")
+            .values(unlocked_at=datetime(2026, 11, 20, tzinfo=UTC), workout_id=None)
+        )
+        await s.commit()
+    tier = achievement(await progress(client, h), "level")["tiers"][0]
+    assert tier["unlocked_at"].startswith("2026-11-04T18:00") and tier["workout_id"] == ids[2]
+
+
+async def test_a_title_can_take_you_to_a_level(client, user):
+    h = user["headers"]
+    # 350 + First Rep 100, + 300; the next week 80 + streak bonus 20 + On a Roll 100: 950 XP
+    # (level 4; level 5 is 1000). Never 3 workouts in a week, so no community goal either.
+    for day, n in ((2, 30), (3, 25), (9, 3)):
+        await workout(client, h, f"2026-11-{day:02d}T18:00:00Z", [{"exercise_name": "Leg Press", "sets": sets(n, 10, 5)}])
+    assert (await progress(client, h))["level"] == 4
+    # Then the 10th weigh-in unlocks "Tracker" (+100): that's what reached level 5.
+    for i in range(10):
+        entry = {"measured_at": f"2026-11-{10 + i:02d}T07:00:00Z", "weight": 80, "unit": "kg"}
+        await client.put(f"/api/v1/body-weights/{uuid.uuid4()}", json=entry, headers=h)
+    p = await progress(client, h)
+    assert (p["xp"], p["level"]) == (1050, 5)
+    tier = achievement(p, "level")["tiers"][0]
+    assert tier["unlocked_at"].startswith("2026-11-19T07:00") and tier["workout_id"] is None
 
 
 async def test_consistency_rules(client, user):

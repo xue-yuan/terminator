@@ -167,6 +167,7 @@ async def test_activity_lists_every_workout_in_brief(client, user, make_user):
                     {"reps": 5, "weight": 60, "kind": "warmup"},
                     {"reps": 5, "weight": 100},
                     {"reps": 5, "weight": 100},
+                    {"reps": 0, "weight": 100},  # 0 reps (older builds allowed it): not a set
                 ],
             },
             {"exercise_name": "Plank", "sets": []},

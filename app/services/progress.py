@@ -17,7 +17,7 @@ from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -90,6 +90,7 @@ class Replay:
         self.values: dict[str, float] = defaultdict(float)
         self.unlocked: dict[tuple[str, float], Unlocked] = {}
         self.workout_xp: dict[UUID, int] = {}
+        self.workout_at: dict[UUID, datetime] = {}
         self.state: dict[str, dict] = defaultdict(dict)  # per achievement, for those that need more than a number
         # Shared by several rules.
         self.workouts = 0
@@ -156,6 +157,7 @@ class Replay:
         bonus = 0
         if first_this_week and self.streak >= 2:
             bonus = min(RULES["streak_bonus_per_week"] * self.streak, RULES["streak_bonus_max"])
+        self.workout_at[w.id] = w.at
         self.workout_xp[w.id] = (
             RULES["workout"]
             + RULES["working_set"] * min(w.working_sets, RULES["max_sets_per_workout"])
@@ -386,6 +388,63 @@ class ProgressService:
         ]
         await self._unlock(unlocks)
 
+    async def _date_levels(self, user_id: int, level: int, replay: Replay, awards, stored) -> bool:
+        """Unlock the level tiers `level` has reached, each dated by what took the XP
+        there (a workout, or a title's XP), replaying the banked XP in time order.
+        Rows dated later than that (by builds that dated a level when it was first
+        seen) move back to it. Returns whether anything changed."""
+        levels = BY_ID["level"]
+        reached = self._level_times(replay, awards, stored)
+        now = datetime.now(UTC)
+        new, moved = [], []
+        for t in levels.tiers:
+            if level < t.target:
+                continue
+            at, workout_id = reached.get(t.target, (now, None))
+            row = stored.get((levels.id, t.target))
+            if row is None:
+                new.append(
+                    {"user_id": user_id, "achievement": levels.id, "target": t.target, "unlocked_at": at, "workout_id": workout_id}
+                )
+            elif at < row.unlocked_at:
+                moved.append((t.target, at, workout_id))
+        await self._unlock(new)
+        for target, at, workout_id in moved:
+            await self.db.execute(
+                update(AchievementUnlock)
+                .where(
+                    AchievementUnlock.user_id == user_id,
+                    AchievementUnlock.achievement == levels.id,
+                    AchievementUnlock.target == target,
+                )
+                .values(unlocked_at=at, workout_id=workout_id)
+            )
+        return bool(new or moved)
+
+    @staticmethod
+    def _level_times(replay: Replay, awards, stored) -> dict[float, tuple[datetime, UUID | None]]:
+        """When the XP total first reached each level tier, and the workout that took it there:
+        {target: (time, workout id or None)}. A workout's XP counts from when it was done (a
+        deleted one's from when it was banked), a title's from when it was unlocked."""
+        tier_xp = {(a.id, t.target): t.xp for a in ACHIEVEMENTS for t in a.tiers}
+        events = [
+            (replay.workout_at.get(wid, banked), 0, xp, wid if wid in replay.workout_at else None)
+            for wid, xp, banked in awards
+        ]
+        events += [
+            (u.unlocked_at, 1, tier_xp[key], u.workout_id)
+            for key, u in stored.items()
+            if key[0] != "level" and tier_xp.get(key)
+        ]
+        targets = sorted(t.target for t in BY_ID["level"].tiers)
+        out: dict[float, tuple[datetime, UUID | None]] = {}
+        total = 0
+        for at, _, xp, workout_id in sorted(events, key=lambda e: (e[0], e[1])):
+            total += xp
+            while targets and total >= xp_for_level(int(targets[0])):
+                out[targets.pop(0)] = (at, workout_id)
+        return out
+
     async def _unlock(self, rows: list[dict]) -> None:
         for i in range(0, len(rows), CHUNK):
             await self.db.execute(insert(AchievementUnlock).values(rows[i : i + CHUNK]).on_conflict_do_nothing())
@@ -410,21 +469,15 @@ class ProgressService:
         )
 
         stored = await self._stored(user.id)
-        workout_xp = await self.db.scalar(
-            select(func.coalesce(func.sum(XpAward.xp), 0)).where(XpAward.user_id == user.id)
-        )
+        awards = (
+            await self.db.execute(
+                select(XpAward.workout_id, XpAward.xp, XpAward.updated_at).where(XpAward.user_id == user.id)
+            )
+        ).all()
         tier_xp = sum(t.xp for a in ACHIEVEMENTS for t in a.tiers if (a.id, t.target) in stored)
-        xp = int(workout_xp) + tier_xp
+        xp = sum(x for _, x, _ in awards) + tier_xp
         level = level_for(xp)
-        now = datetime.now(UTC)
-        levels = BY_ID["level"]
-        new = [
-            {"user_id": user.id, "achievement": levels.id, "target": t.target, "unlocked_at": now, "workout_id": None}
-            for t in levels.tiers
-            if level >= t.target and (levels.id, t.target) not in stored
-        ]
-        if new:
-            await self._unlock(new)
+        if await self._date_levels(user.id, level, replay, awards, stored):
             stored = await self._stored(user.id)
         await self.db.commit()
 
